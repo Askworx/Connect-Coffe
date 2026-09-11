@@ -1,0 +1,10 @@
+# Secrets — the bot's .env holds the Meta token and the panel password.
+.env
+.env.*
+!.env.example
+
+node_modules/
+panel/dist/
+bot/connect-bot
+bot/uploads/
+.DS_Store

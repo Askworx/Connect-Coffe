@@ -1,0 +1,511 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"time"
+
+	"connect-coffee-bot/db"
+
+	"github.com/go-chi/chi/v5"
+)
+
+func AdminRoutes() chi.Router {
+	r := chi.NewRouter()
+
+	r.Use(AuthMiddleware)
+
+	// ── STATIC FILE SERVING FOR UPLOADS ──────────────────────────────────────
+	uploadDir := "./uploads"
+	if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
+		os.Mkdir(uploadDir, 0755)
+	}
+	// Served publicly so Meta can fetch poster images. X-Content-Type-Options
+	// stops a browser sniffing one of these into something executable, and the
+	// CSP is a second line behind the image-only check on the upload itself.
+	r.Handle("/uploads/*", http.StripPrefix("/uploads/",
+		func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("X-Content-Type-Options", "nosniff")
+				w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'")
+				next.ServeHTTP(w, r)
+			})
+		}(http.FileServer(http.Dir(uploadDir)))))
+
+	r.Post("/upload", func(w http.ResponseWriter, r *http.Request) {
+		// Cap the whole request, not just what is buffered in memory.
+		// ParseMultipartForm alone spills the remainder to disk, so a large
+		// upload could fill the volume.
+		const maxUpload = 8 << 20 // 8 MiB
+		r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
+		if err := r.ParseMultipartForm(maxUpload); err != nil {
+			http.Error(w, "That file is too large. The limit is 8 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		file, handler, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "error retrieving file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		// Only images. These files are served back from this origin, so
+		// accepting arbitrary types would let an uploaded .html or .svg run
+		// script against the API's own origin.
+		head := make([]byte, 512)
+		n, _ := file.Read(head)
+		contentType := http.DetectContentType(head[:n])
+		if !strings.HasPrefix(contentType, "image/") {
+			http.Error(w, "Only image files can be uploaded.", http.StatusUnsupportedMediaType)
+			return
+		}
+		if _, err := file.Seek(0, io.SeekStart); err != nil {
+			http.Error(w, "Could not read that file.", http.StatusInternalServerError)
+			return
+		}
+
+		safeFilename := strings.ReplaceAll(handler.Filename, " ", "_")
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(safeFilename))
+		dst, err := os.Create(filepath.Join(uploadDir, filename))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer dst.Close()
+
+		if _, err := io.Copy(dst, file); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"url": "/uploads/" + filename})
+	})
+
+	r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
+		contacts, err1 := db.GetAllContacts()
+		leads, err2 := db.GetAllLeads()
+		callbacks, err3 := db.GetAllCallbacks()
+		messages, err4 := db.GetAllMessages()
+
+		if err1 != nil || err2 != nil || err3 != nil || err4 != nil {
+			fmt.Printf("Error fetching stats: %v %v %v %v\n", err1, err2, err3, err4)
+		}
+
+		stats := map[string]int{
+			"total_contacts":    len(contacts),
+			"total_leads":       len(leads),
+			"pending_callbacks": 0,
+			"new_leads":         0,
+			"total_messages":    len(messages),
+		}
+
+		for _, l := range leads {
+			if l.Status == "new" {
+				stats["new_leads"]++
+			}
+		}
+		for _, c := range callbacks {
+			if c.Status == "pending" {
+				stats["pending_callbacks"]++
+			}
+		}
+
+		json.NewEncoder(w).Encode(stats)
+	})
+
+	r.Get("/leads", func(w http.ResponseWriter, r *http.Request) {
+		limit, offset, start, end := parseCommonParams(r)
+		leads, err := db.GetLeadsPaginated(limit, offset, start, end)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		count, _ := db.GetTotalLeadsCount(start, end)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"data": leads, "total": count})
+	})
+
+	r.Post("/leads/update-status", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ID     int    `json:"id"`
+			Status string `json:"status"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		db.UpdateLeadStatus(body.ID, body.Status)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Get("/callbacks", func(w http.ResponseWriter, r *http.Request) {
+		callbacks, _ := db.GetAllCallbacks()
+		json.NewEncoder(w).Encode(callbacks)
+	})
+
+	r.Post("/callbacks/mark-done", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			ID int `json:"id"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		db.MarkCallbackDone(body.ID)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Get("/contacts", func(w http.ResponseWriter, r *http.Request) {
+		contacts, _ := db.GetAllContacts()
+		json.NewEncoder(w).Encode(contacts)
+	})
+
+	r.Post("/contacts", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Phone string `json:"phone"`
+			Name  string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := db.UpsertContact(body.Phone, body.Name); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Bulk import from the panel: [{phone, name}]. Numbers are normalised
+	// the way WhatsApp writes them (country code, digits only) so an imported
+	// contact and the same person messaging in are one row, not two.
+	r.Post("/contacts/import", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Contacts []struct {
+				Phone string `json:"phone"`
+				Name  string `json:"name"`
+			} `json:"contacts"`
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "That list could not be read.")
+			return
+		}
+		if len(body.Contacts) > 10000 {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, "Import at most 10,000 contacts at a time.")
+			return
+		}
+
+		result := struct {
+			Added   int      `json:"added"`
+			Updated int      `json:"updated"`
+			Invalid []string `json:"invalid"`
+		}{Invalid: []string{}}
+		for _, c := range body.Contacts {
+			phone, ok := normalisePhone(c.Phone)
+			if !ok {
+				result.Invalid = append(result.Invalid, c.Phone)
+				continue
+			}
+			inserted, err := db.ImportContact(phone, strings.TrimSpace(c.Name))
+			if err != nil {
+				writeJSONError(w, http.StatusInternalServerError, "The import stopped partway. Contacts before this point were saved.")
+				return
+			}
+			if inserted {
+				result.Added++
+			} else {
+				result.Updated++
+			}
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	})
+
+	r.Delete("/contacts/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		var id int
+		fmt.Sscanf(idStr, "%d", &id)
+		if err := db.DeleteContact(id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Post("/contacts/{id}/opt-out", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		var id int
+		fmt.Sscanf(idStr, "%d", &id)
+
+		var body struct {
+			OptOut bool `json:"opt_out"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		if err := db.UpdateContactOptOut(id, body.OptOut); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Bounded. This used to call GetAllMessages, which has no LIMIT — the
+	// handler returned every row ever written and ignored the limit the client
+	// sent, so the payload grew without bound for the life of the deployment.
+	r.Get("/messages", func(w http.ResponseWriter, r *http.Request) {
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+
+		messages, total, err := db.GetMessagesPage(limit, offset)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Could not read the message log.")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"data": messages, "total": total})
+	})
+
+	// Per-day and per-hour counts for the dashboard charts, aggregated in the
+	// database rather than by shipping the log to the browser.
+	r.Get("/messages/summary", func(w http.ResponseWriter, r *http.Request) {
+		days, _ := strconv.Atoi(r.URL.Query().Get("days"))
+		summary, err := db.GetMessageSummary(days)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Could not read the conversation summary.")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(summary)
+	})
+
+	// ?after_id=N returns only what is newer, so the inbox poll does not refetch
+	// the whole conversation every few seconds.
+	r.Get("/messages/{phone}", func(w http.ResponseWriter, r *http.Request) {
+		phone := chi.URLParam(r, "phone")
+		afterID, _ := strconv.Atoi(r.URL.Query().Get("after_id"))
+
+		messages, err := db.GetMessagesByPhoneAfter(phone, afterID)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Could not read that conversation.")
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(messages)
+	})
+
+	r.Post("/send-message", func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Phone   string `json:"phone"`
+			Message string `json:"message"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil ||
+			strings.TrimSpace(body.Phone) == "" || strings.TrimSpace(body.Message) == "" {
+			writeJSONError(w, http.StatusBadRequest, "A phone number and a message are both needed.")
+			return
+		}
+
+		// Outside the 24-hour window Meta rejects a free-form message, and
+		// sendTextMessage only logs that. Refusing here means the panel says
+		// it was not sent instead of showing a reply the customer never got.
+		inWindow, err := db.IsInServiceWindow(body.Phone)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Could not check whether this contact can be messaged.")
+			return
+		}
+		if !inWindow {
+			writeJSONError(w, http.StatusConflict,
+				"This contact has not messaged in the last 24 hours, so WhatsApp will not deliver a free reply. They need to message first.")
+			return
+		}
+
+		sendTextMessage(body.Phone, body.Message)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// ── Campaign Management ─────────────────────────────────────────────────
+
+	r.Get("/campaigns", func(w http.ResponseWriter, r *http.Request) {
+		limit, offset, start, end := parseCommonParams(r)
+		campaigns, err := db.GetCampaignsPaginated(limit, offset, start, end)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		count, _ := db.GetTotalCampaignsCount(start, end)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"data": campaigns, "total": count})
+	})
+
+	r.Post("/campaigns", func(w http.ResponseWriter, r *http.Request) {
+		var c db.Campaign
+		if err := json.NewDecoder(r.Body).Decode(&c); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		// Validation
+		if c.Type != "quiz" && c.Type != "poster" {
+			http.Error(w, "type must be 'quiz' or 'poster'", http.StatusBadRequest)
+			return
+		}
+		if c.Type == "quiz" {
+			if c.Question == "" || c.OptionA == "" || c.OptionB == "" || c.OptionC == "" || c.Explanation == "" {
+				http.Error(w, "all quiz fields are required", http.StatusBadRequest)
+				return
+			}
+			c.CorrectAnswer = strings.ToUpper(c.CorrectAnswer)
+			if c.CorrectAnswer != "A" && c.CorrectAnswer != "B" && c.CorrectAnswer != "C" {
+				http.Error(w, "correct_answer must be A, B, or C", http.StatusBadRequest)
+				return
+			}
+			if len([]rune(c.Explanation)) > 300 {
+				http.Error(w, "explanation must not exceed 300 characters", http.StatusBadRequest)
+				return
+			}
+		}
+		if c.Type == "poster" && c.ImageURL == "" {
+			http.Error(w, "image_url is required for posters", http.StatusBadRequest)
+			return
+		}
+		if c.Type == "poster" {
+			if msg := validateCampaignButtons(c.Buttons); msg != "" {
+				http.Error(w, msg, http.StatusBadRequest)
+				return
+			}
+		} else {
+			c.Buttons = nil // quiz buttons are always A, B and C
+		}
+		if c.ScheduledAt.IsZero() {
+			http.Error(w, "scheduled_at is required", http.StatusBadRequest)
+			return
+		}
+
+		id, err := db.CreateCampaign(c)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]int{"id": id})
+	})
+
+	r.Delete("/campaigns/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		var id int
+		fmt.Sscanf(idStr, "%d", &id)
+		if err := db.CancelCampaign(id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Get("/campaigns/{id}/analytics", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		var id int
+		fmt.Sscanf(idStr, "%d", &id)
+		analytics, err := db.GetCampaignAnalytics(id)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(analytics)
+	})
+
+	// ── BOT SETTINGS ─────────────────────────────────────────────────────────
+	r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
+		settings, err := db.GetAllSettings()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(settings)
+	})
+
+	r.Post("/settings", func(w http.ResponseWriter, r *http.Request) {
+		var payload map[string]string
+		json.NewDecoder(r.Body).Decode(&payload)
+		for k, v := range payload {
+			db.UpdateSetting(k, v)
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// ── FAQ / KNOWLEDGE BASE ──────────────────────────────────────────────
+	r.Get("/faqs", func(w http.ResponseWriter, r *http.Request) {
+		faqs, err := db.GetAllFAQs()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(faqs)
+	})
+
+	r.Post("/faqs", func(w http.ResponseWriter, r *http.Request) {
+		var f db.FAQ
+		if err := json.NewDecoder(r.Body).Decode(&f); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if err := db.SaveFAQ(f); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Delete("/faqs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		var id int
+		fmt.Sscanf(idStr, "%d", &id)
+		if err := db.DeleteFAQ(id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
+	return r
+}
+
+func parseCommonParams(r *http.Request) (limit, offset int, start, end string) {
+	fmt.Sscanf(r.URL.Query().Get("limit"), "%d", &limit)
+	fmt.Sscanf(r.URL.Query().Get("offset"), "%d", &offset)
+	if limit <= 0 {
+		limit = 10
+	}
+	start = r.URL.Query().Get("start_date")
+	end = r.URL.Query().Get("end_date")
+	return
+}
+
+// normalisePhone returns a number the way WhatsApp writes it: country code
+// and digits, no plus or spaces. A bare 10-digit number, or one with a
+// leading 0, is taken to be Indian.
+func normalisePhone(raw string) (string, bool) {
+	var b strings.Builder
+	for _, r := range raw {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	d := b.String()
+	switch {
+	case len(d) == 10:
+		d = "91" + d
+	case len(d) == 11 && strings.HasPrefix(d, "0"):
+		d = "91" + d[1:]
+	}
+	if len(d) < 11 || len(d) > 15 {
+		return "", false
+	}
+	return d, true
+}

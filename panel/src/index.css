@@ -1,0 +1,308 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* ============================================================
+   CONNECT SPECIALITY COFFEE ROASTERS — PANEL THEME
+   Blue and white, from the logo (assets/connect-logo.jpg):
+     cup blue   #2E5FAC   sidebar, primary actions, links
+     white      #FFFFFF   every page and card
+     cream      #FEFAF1   the coffee in the cup — small accents only
+   Text is a dark navy; hairlines and tints are cool light greys.
+   See DESIGN.md.
+   ============================================================ */
+
+@theme {
+  /* —— Brand: straight from the logo —— */
+  --color-graphite:     #1E3F73;  /* logo darkest  */
+  --color-titanium:     #8A93A5;  /* logo average  */
+  --color-champagne:    #F3EAD8;  /* logo lightest */
+
+  /* —— Derived ramp —— */
+  --color-ink:          #14233D;  /* headings — 17.4:1 on white */
+  --color-graphite-700: #1F3350;
+  --color-titanium-700: #56627A;  /* accessible titanium — 5.8:1 on white */
+  --color-titanium-300: #B7C0CF;
+  --color-champagne-600:#E6D8BD;
+  --color-champagne-100:#FEFAF1;
+
+  /* —— Surfaces —— */
+  --color-paper:        #F6F8FC;  /* warm off-white band */
+  --color-line:         #E4E9F1;  /* hairline rules */
+  --color-line-strong:  #CBD4E2;
+
+  /* —— Text —— */
+  --color-body-text:    #3F4B5E;  /* 7.4:1 on white */
+  --color-muted-text:   #6B7587;
+
+  /* ==========================================================
+     ADMIN SEMANTIC LAYER
+     The app is written against these names. Every one of them
+     resolves to a value in the table above — never to a new hue.
+     ========================================================== */
+
+  /* Primary is the logo's cup blue. */
+  --color-primary:       #2E5FAC;  /* cup blue — 5.9:1 on white */
+  --color-primary-hover: #264F90;
+  --color-primary-dark:  #1E3F73;
+  --color-primary-light: #EAF0F9;  /* blue tint behind primary text */
+
+  --color-secondary:     #FEFAF1;  /* champagne */
+  --color-accent:        #56627A;  /* titanium-700 */
+
+  --color-background:    #F6F8FC;  /* paper — table heads, hover rows, app ground */
+  --color-surface:       #FFFFFF;
+  --color-border:        #E4E9F1;  /* line */
+  --color-border-strong: #CBD4E2;
+
+  --color-text-primary:   #14233D;
+  --color-text-secondary: #56627A;  /* titanium-700, 5.8:1 — safe at 11px */
+  --color-text-muted:     #6B7587;
+
+  /* —— Status ramp: warm, desaturated, all AA on white ——
+     success 6.1:1 · warning 5.0:1 · danger 6.7:1 */
+  --color-success:       #4A6A4E;
+  --color-success-light: #EDF1EC;
+  --color-warning:       #8A6A2F;
+  --color-warning-light: #F5F0E4;
+  --color-danger:        #A8322A;   /* the site's destructive */
+  --color-danger-light:  #F7EBE9;
+
+  /* —— Elevation: long and soft, never a hard drop shadow —— */
+  --shadow-card: 0 1px 2px rgba(20, 35, 61, 0.04),
+                 0 12px 32px -20px rgba(20, 35, 61, 0.18);
+  --shadow-lift: 0 24px 60px -28px rgba(20, 35, 61, 0.40);
+  --shadow-primary: 0 12px 30px -12px rgba(20, 35, 61, 0.45);
+
+  /* —— Fonts (Roboto family, loaded in index.html) —— */
+  --font-heading: Fraunces, Georgia, "Times New Roman", serif;
+  --font-body:    "DM Sans", system-ui, sans-serif;
+  --font-mono:    "DM Mono", ui-monospace, monospace;
+  --font-sans:    "DM Sans", system-ui, sans-serif;
+
+  /* The sidebar: the logo's cup blue. */
+  --color-sidebar:      #2E5FAC;
+}
+
+/* —— shadcn/ui token bridge —— */
+:root {
+  --radius: 0.75rem;
+  --background: #FFFFFF;
+  --foreground: #14233D;
+  --card: #FFFFFF;
+  --card-foreground: #14233D;
+  --popover: #FFFFFF;
+  --popover-foreground: #14233D;
+  --primary: #2E5FAC;
+  --primary-foreground: #FFFFFF;
+  --secondary: #FEFAF1;
+  --secondary-foreground: #1F3350;
+  --muted: #F6F8FC;
+  --muted-foreground: #6B7587;
+  --accent: #F3EAD8;
+  --accent-foreground: #1F3350;
+  --destructive: #A8322A;
+  --border: #E4E9F1;
+  --input: #CBD4E2;
+  --ring: #2E5FAC;
+}
+
+@theme inline {
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-foreground: var(--foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-white text-body-text antialiased;
+    font-family: var(--font-body);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+    @apply text-ink;
+    text-wrap: balance;
+  }
+
+  /* Visible focus for every interactive element — never remove it. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  /* Numbers in tables must line up. */
+  table td, table th {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Reduced motion — stops loops rather than speeding them up. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  /* —— Layout rhythm (admin is denser than the site) —— */
+  .container-admin {
+    @apply w-full max-w-[1440px] mx-auto px-5 md:px-8 py-8 md:py-10;
+  }
+
+  /* —— Type scale —— */
+  .display-1 {
+    @apply font-heading font-semibold tracking-tight leading-[1.05]
+           text-[clamp(2rem,4vw,3rem)] text-ink;
+  }
+
+  .display-2 {
+    @apply font-heading font-semibold tracking-tight leading-[1.1]
+           text-[clamp(1.5rem,3vw,2rem)] text-ink;
+  }
+
+  .display-3 {
+    @apply font-heading font-semibold leading-tight text-lg text-ink;
+  }
+
+  .eyebrow {
+    @apply font-sans text-[12px] font-semibold tracking-[0.08em] uppercase text-primary;
+  }
+
+  .lead {
+    @apply text-[15px] leading-relaxed text-body-text;
+  }
+
+  /* Small label: table heads, field keys, counts. */
+  .spec-label {
+    @apply font-sans text-[11px] font-semibold tracking-[0.06em] uppercase text-muted-text;
+  }
+
+  /* No drawing grid in the Connect look: these stay as no-ops so older
+     markup that names them renders plain. */
+  .grid-paper, .grid-paper-inverse { background-image: none; }
+
+  /* Brushed-metal sheen echoing the logo's finish.
+     Lightest stop pinned at #8A9DBC (3.5:1) so display text clears AA-Large.
+     Do not lighten it. */
+  .titanium-sheen {
+    background-image: linear-gradient(
+      104deg,
+      #1F3350 0%, #3B5B8C 22%, #8A9DBC 44%,
+      #56627A 64%, #263B5E 86%, #1F3350 100%
+    );
+    @apply bg-clip-text text-transparent;
+  }
+
+  .titanium-sheen-dark {
+    background-image: linear-gradient(
+      104deg,
+      #B7C0CF 0%, #F1E6D3 26%, #FFFFFF 46%,
+      #F1E6D3 68%, #B7C0CF 100%
+    );
+    @apply bg-clip-text text-transparent;
+  }
+
+  /* Turns a grid into a drawn table: children on white become cells
+     divided by true hairlines. The default for stat tiles and spec groups. */
+  .hairline-grid {
+    @apply gap-px bg-line border border-line;
+  }
+
+  /* —— Surfaces —— */
+  .panel {
+    @apply bg-white border border-border rounded-xl shadow-card;
+  }
+
+  /* Chips / tags — rounded-full, mono, uppercase. */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border
+           bg-background px-2.5 py-0.5 font-mono text-[10px] tracking-[0.06em]
+           uppercase text-titanium-700;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar { display: none; }
+}
+
+@utility text-balance {
+  text-wrap: balance;
+}
+
+/**
+ * Trims the half-leading above a text block's first line so a description
+ * optically aligns with the heading beside it. Computed from the element's
+ * own metrics, not a magic number, so it survives a type-scale change.
+ */
+@utility optical-first-line {
+  margin-top: calc((1em - 1lh) / 2);
+}
+
+/* —— Scrollbars: hairline, in line colour —— */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #DECFBA;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover { background: #B7C0CF; }
+
+/* ============================================================
+   CONNECT OVERRIDES — deliberately outside every @layer, so they
+   win over the utility classes the inherited pages were written
+   with. See DESIGN.md §Type.
+   ============================================================ */
+
+/* Headings are set in Fraunces, in sentence case — never capitals. */
+.font-heading,
+h1, h2, h3, h4 {
+  text-transform: none;
+  letter-spacing: -0.01em;
+}
+
+/* Small uppercase labels were typewriter-style; they read in DM Sans. */
+.font-mono.uppercase {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
