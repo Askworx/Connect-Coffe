@@ -180,6 +180,9 @@ const buttonProblem = (buttons) => {
   return problems.join(' ');
 };
 
+/** An offer whose time has come: the bot is sending it now. */
+const isDue = (c) => c.scheduled_at && new Date(c.scheduled_at) <= new Date();
+
 /** The first line of the caption, without WhatsApp's formatting marks. */
 const headline = (campaign) =>
   (campaign.caption || '').split('\n').find((l) => l.trim())?.replace(/[*_~`]/g, '').trim() ||
@@ -213,10 +216,12 @@ export default function Campaigns() {
   // address to its public one before handing it to Meta.
   const API_BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
-  const load = useCallback(async () => {
+  // `quiet` is the background refresh while an offer is going out: it
+  // updates the rows without flashing the loading state.
+  const load = useCallback(async (quiet = false) => {
     setLoadError('');
     try {
-      setLoading(true);
+      if (!quiet) setLoading(true);
       const { data } = await getCampaigns({ limit: PAGE_SIZE, offset: page * PAGE_SIZE });
       // Quizzes are not part of this panel; any old ones are left out.
       setCampaigns((data.data || []).filter((c) => c.type === 'poster'));
@@ -248,6 +253,17 @@ export default function Campaigns() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // While an offer is going out, keep the list current so it flips to Sent
+  // by itself.
+  const inFlight = campaigns.some(
+    (c) => c.status === 'sending' || (c.status === 'scheduled' && isDue(c)),
+  );
+  useEffect(() => {
+    if (!inFlight) return undefined;
+    const interval = setInterval(() => load(true), 3000);
+    return () => clearInterval(interval);
+  }, [inFlight, load]);
 
   useEffect(() => {
     loadAudience();
@@ -352,7 +368,7 @@ export default function Campaigns() {
         title: when === 'now' ? 'Offer on its way' : 'Offer scheduled',
         message:
           when === 'now'
-            ? 'It goes out within a minute to everyone who messaged in the last 24 hours.'
+            ? 'It is going out now to everyone who messaged in the last 24 hours.'
             : 'It will go out at the time you set. You can cancel it from this page until then.',
         type: 'success',
       });
@@ -467,7 +483,7 @@ export default function Campaigns() {
             <p className="text-[13px] font-medium text-danger">{loadError}</p>
             <button
               type="button"
-              onClick={load}
+              onClick={() => load()}
               className="mt-1 text-[13px] font-medium text-danger underline underline-offset-2"
             >
               Try again
@@ -491,7 +507,9 @@ export default function Campaigns() {
 
             <TableBody>
               {campaigns.map((campaign) => {
-                const status = getBroadcastStatus(campaign.status);
+                const status = getBroadcastStatus(
+                  campaign.status === 'scheduled' && isDue(campaign) ? 'sending' : campaign.status,
+                );
                 return (
                   <TableRow key={campaign.id}>
                     <TableCell>
@@ -536,7 +554,7 @@ export default function Campaigns() {
                     </TableCell>
 
                     <TableCell className="text-right">
-                      {campaign.status === 'scheduled' && (
+                      {campaign.status === 'scheduled' && !isDue(campaign) && (
                         <Button
                           variant="destructive-outline"
                           size="icon-xs"

@@ -390,6 +390,11 @@ func AdminRoutes() chi.Router {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// "Send now" goes out straight away rather than at the next
+		// one-minute tick. ClaimCampaign stops the tick sending it again.
+		if !c.ScheduledAt.After(time.Now()) {
+			go sendDueCampaigns()
+		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]int{"id": id})
 	})
