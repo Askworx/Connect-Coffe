@@ -48,6 +48,23 @@ func sendImage(to, imageURL, caption string) {
 	sendToMeta(payload, to, "[Image: "+imageURL+"] "+caption)
 }
 
+// sendDocument sends a file, such as the menu PDF, that WhatsApp opens in its
+// own viewer. filename is what the customer sees on the attachment.
+func sendDocument(to, docURL, filename, caption string) {
+	payload := map[string]interface{}{
+		"messaging_product": "whatsapp",
+		"recipient_type":    "individual",
+		"to":                to,
+		"type":              "document",
+		"document": map[string]string{
+			"link":     docURL,
+			"filename": filename,
+			"caption":  caption,
+		},
+	}
+	sendToMeta(payload, to, "[Document: "+docURL+"] "+caption)
+}
+
 func sendInteractiveButtons(to, bodyText string, buttons []Button) {
 	var waButtons []map[string]interface{}
 	for _, b := range buttons {

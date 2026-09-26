@@ -149,9 +149,15 @@ func sendWelcome(phone string) {
 
 func sendMenu(phone string) {
 	resetConversation(phone)
-	for _, url := range strings.Split(db.GetSetting("menu_images"), "\n") {
-		if url = strings.TrimSpace(url); url != "" {
-			sendImage(phone, publicImageURL(url), "")
+	// One PDF the customer scrolls through beats a burst of separate images;
+	// the images are the fallback when no PDF is set.
+	if pdf := strings.TrimSpace(db.GetSetting("menu_pdf")); pdf != "" {
+		sendDocument(phone, publicImageURL(pdf), db.SettingOr("menu_pdf_name", "Menu.pdf"), "")
+	} else {
+		for _, url := range strings.Split(db.GetSetting("menu_images"), "\n") {
+			if url = strings.TrimSpace(url); url != "" {
+				sendImage(phone, publicImageURL(url), "")
+			}
 		}
 	}
 	body := renderTemplate(db.SettingOr("menu_body", "☕ *Our Menu*"))

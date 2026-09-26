@@ -46,13 +46,25 @@ const GROUPS = [
       {
         key: 'menu_body',
         label: 'Menu message',
-        help: 'Sent after the menu photos, above the Book / Visit Us buttons.',
+        help: 'Sent after the menu, above the Book / Visit Us buttons.',
         placeholders: ['company'],
+      },
+      {
+        key: 'menu_pdf',
+        label: 'Menu PDF',
+        help: 'Link to the menu as one PDF. Customers get a single file they scroll through. Leave empty to send the photos below instead.',
+        plain: true,
+      },
+      {
+        key: 'menu_pdf_name',
+        label: 'Menu PDF file name',
+        help: 'The name customers see on the attachment, ending in .pdf.',
+        plain: true,
       },
       {
         key: 'menu_images',
         label: 'Menu photos',
-        help: 'One photo link per line. Each is sent as its own photo, in this order.',
+        help: 'Used only when no menu PDF is set. One photo link per line, each sent as its own photo, in this order.',
         plain: true,
         multiline: true,
       },

@@ -68,7 +68,10 @@ var defaultSettings = map[string]string{
 	// ── Menu ─────────────────────────────────────────────────────────────
 	// One image address per line; each is sent as its own photo.
 	"menu_images": placeholderMenu1 + "\n" + placeholderMenu2,
-	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the photos above.\n\nFancy a seat? Book a table below 👇",
+	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the menu above.\n\nFancy a seat? Book a table below 👇",
+	// Set menu_pdf to send the whole menu as one file instead of menu_images.
+	"menu_pdf":      "",
+	"menu_pdf_name": "Connect Menu.pdf",
 
 	// ── Booking ──────────────────────────────────────────────────────────
 	"booking_intro": "📅 *Book with us*\n\n" +
