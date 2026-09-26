@@ -39,14 +39,20 @@ const GROUPS = [
       {
         key: 'welcome_body',
         label: 'Welcome message',
-        help: 'Sent when somebody says hi, with a photo and the Menu / Book / Visit Us buttons.',
+        help: 'Sent when somebody says hi, with a photo and the Menu / Offers / Visit Us buttons.',
         image: 'welcome_image',
         placeholders: ['company'],
       },
       {
         key: 'menu_body',
         label: 'Menu message',
-        help: 'Sent after the menu, above the Book / Visit Us buttons.',
+        help: 'Sent after the menu, above the Offers / Visit Us / Home buttons.',
+        placeholders: ['company'],
+      },
+      {
+        key: 'offers_empty',
+        label: 'When there are no offers',
+        help: 'Sent when someone taps Offers and nothing is switched on in the Offers page.',
         placeholders: ['company'],
       },
       {
@@ -118,7 +124,7 @@ const GROUPS = [
       {
         key: 'promo_body',
         label: 'Follow-up offer',
-        help: 'Sent with the photo and Book Now / Menu / Stop offers buttons.',
+        help: 'Sent with the photo and Offers / Menu / Stop offers buttons.',
         image: 'promo_image',
         placeholders: ['company'],
       },
@@ -149,7 +155,7 @@ const BUTTON_GROUPS = [
     help: 'On the welcome message and after most replies.',
     buttons: [
       { key: 'view_menu', label: 'Menu' },
-      { key: 'book', label: 'Book' },
+      { key: 'view_offers', label: 'Offers' },
       { key: 'visit', label: 'Visit us' },
       { key: 'main_menu', label: 'Home (back to the welcome message)' },
     ],
@@ -164,11 +170,8 @@ const BUTTON_GROUPS = [
   },
   {
     label: 'Follow-up offer',
-    help: 'Under the automatic follow-up offer.',
-    buttons: [
-      { key: 'book_now', label: 'Book now' },
-      { key: 'opt_out', label: 'Stop offers' },
-    ],
+    help: 'Under the automatic follow-up offer, next to Offers and Menu.',
+    buttons: [{ key: 'opt_out', label: 'Stop offers' }],
   },
 ];
 

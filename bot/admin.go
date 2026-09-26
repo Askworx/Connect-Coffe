@@ -425,6 +425,71 @@ func AdminRoutes() chi.Router {
 		json.NewEncoder(w).Encode(analytics)
 	})
 
+	// ── Offers (shown when a customer taps Offers) ───────────────────────────
+
+	r.Get("/offers", func(w http.ResponseWriter, r *http.Request) {
+		offers, err := db.ListOffers()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(offers)
+	})
+
+	saveOffer := func(w http.ResponseWriter, r *http.Request, id int) {
+		var o db.Offer
+		if err := json.NewDecoder(r.Body).Decode(&o); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		o.ID = id
+		o.Title = strings.TrimSpace(o.Title)
+		o.Description = strings.TrimSpace(o.Description)
+		o.ImageURL = strings.TrimSpace(o.ImageURL)
+		if msg := validateOffer(o); msg != "" {
+			http.Error(w, msg, http.StatusBadRequest)
+			return
+		}
+		if id == 0 {
+			newID, err := db.CreateOffer(o)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			id = newID
+		} else if err := db.UpdateOffer(o); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]int{"id": id})
+	}
+
+	r.Post("/offers", func(w http.ResponseWriter, r *http.Request) { saveOffer(w, r, 0) })
+
+	r.Put("/offers/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil || id <= 0 {
+			http.Error(w, "invalid offer id", http.StatusBadRequest)
+			return
+		}
+		saveOffer(w, r, id)
+	})
+
+	r.Delete("/offers/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id, err := strconv.Atoi(chi.URLParam(r, "id"))
+		if err != nil || id <= 0 {
+			http.Error(w, "invalid offer id", http.StatusBadRequest)
+			return
+		}
+		if err := db.DeleteOffer(id); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+
 	// ── BOT SETTINGS ─────────────────────────────────────────────────────────
 	r.Get("/settings", func(w http.ResponseWriter, r *http.Request) {
 		settings, err := db.GetAllSettings()
