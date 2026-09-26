@@ -48,23 +48,6 @@ func sendImage(to, imageURL, caption string) {
 	sendToMeta(payload, to, "[Image: "+imageURL+"] "+caption)
 }
 
-// sendDocument sends a file, such as the menu PDF, that WhatsApp opens in its
-// own viewer. filename is what the customer sees on the attachment.
-func sendDocument(to, docURL, filename, caption string) {
-	payload := map[string]interface{}{
-		"messaging_product": "whatsapp",
-		"recipient_type":    "individual",
-		"to":                to,
-		"type":              "document",
-		"document": map[string]string{
-			"link":     docURL,
-			"filename": filename,
-			"caption":  caption,
-		},
-	}
-	sendToMeta(payload, to, "[Document: "+docURL+"] "+caption)
-}
-
 func sendInteractiveButtons(to, bodyText string, buttons []Button) {
 	var waButtons []map[string]interface{}
 	for _, b := range buttons {
@@ -102,6 +85,25 @@ func sendInteractiveButtons(to, bodyText string, buttons []Button) {
 }
 
 func sendImageWithButtons(to, imageURL, bodyText string, buttons []Button) {
+	header := map[string]interface{}{
+		"type":  "image",
+		"image": map[string]string{"link": imageURL},
+	}
+	sendButtonsWithHeader(to, header, bodyText, buttons, "[Image: "+imageURL+"] "+bodyText)
+}
+
+// sendDocumentWithButtons puts a file, such as the menu PDF, on top of a
+// button message. One message keeps the file ahead of the text; sent
+// separately, the text often arrives first because Meta fetches the file.
+func sendDocumentWithButtons(to, docURL, filename, bodyText string, buttons []Button) {
+	header := map[string]interface{}{
+		"type":     "document",
+		"document": map[string]string{"link": docURL, "filename": filename},
+	}
+	sendButtonsWithHeader(to, header, bodyText, buttons, "[Document: "+docURL+"] "+bodyText)
+}
+
+func sendButtonsWithHeader(to string, header map[string]interface{}, bodyText string, buttons []Button, logMsg string) {
 	var waButtons []map[string]interface{}
 	for _, b := range buttons {
 		title := b.Title
@@ -124,11 +126,8 @@ func sendImageWithButtons(to, imageURL, bodyText string, buttons []Button) {
 		"to":                to,
 		"type":              "interactive",
 		"interactive": map[string]interface{}{
-			"type": "button",
-			"header": map[string]interface{}{
-				"type":  "image",
-				"image": map[string]string{"link": imageURL},
-			},
+			"type":   "button",
+			"header": header,
 			"body": map[string]string{
 				"text": bodyText,
 			},
@@ -137,7 +136,7 @@ func sendImageWithButtons(to, imageURL, bodyText string, buttons []Button) {
 			},
 		},
 	}
-	sendToMeta(payload, to, "[Image: "+imageURL+"] "+bodyText)
+	sendToMeta(payload, to, logMsg)
 }
 
 // sendLocation sends a map pin the customer can tap to navigate.
