@@ -29,7 +29,9 @@ func AdminRoutes() chi.Router {
 	// Served publicly so Meta can fetch poster images. X-Content-Type-Options
 	// stops a browser sniffing one of these into something executable, and the
 	// CSP is a second line behind the image-only check on the upload itself.
-	r.Handle("/uploads/*", http.StripPrefix("/uploads/",
+	// chi keeps the full path when this router is mounted at /api, so the
+	// prefix to strip includes it.
+	r.Handle("/uploads/*", http.StripPrefix("/api/uploads/",
 		func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("X-Content-Type-Options", "nosniff")
