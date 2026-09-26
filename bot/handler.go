@@ -31,6 +31,7 @@ const (
 	ActionHome     = "main_menu"
 	ActionMenu     = "view_menu"
 	ActionBook     = "book"
+	ActionOffers   = "view_offers"
 	ActionVisit    = "visit"
 	ActionTable    = "book_table"
 	ActionWorkshop = "book_workshop"
@@ -102,6 +103,9 @@ func handleMessage(phone, input string, lat, lng float64) {
 	case text == "visit" || text == "location" || input == ActionVisit:
 		sendVisit(phone)
 		return
+	case text == "offer" || text == "offers" || text == "deals" || input == ActionOffers:
+		sendOffers(phone)
+		return
 	}
 
 	// ── A booking in progress takes whatever is typed next ───────────────
@@ -128,7 +132,7 @@ func renderTemplate(text string) string {
 func homeButtons() []Button {
 	return []Button{
 		{ID: ActionMenu, Title: db.ButtonLabel(ActionMenu, "☕ Menu")},
-		{ID: ActionBook, Title: db.ButtonLabel(ActionBook, "📅 Book")},
+		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},
 		{ID: ActionVisit, Title: db.ButtonLabel(ActionVisit, "📍 Visit Us")},
 	}
 }
@@ -149,17 +153,24 @@ func sendWelcome(phone string) {
 
 func sendMenu(phone string) {
 	resetConversation(phone)
+	body := renderTemplate(db.SettingOr("menu_body", "☕ *Our Menu*"))
+	buttons := []Button{
+		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},
+		{ID: ActionVisit, Title: db.ButtonLabel(ActionVisit, "📍 Visit Us")},
+		{ID: ActionHome, Title: db.ButtonLabel(ActionHome, "🏠 Home")},
+	}
+	// One PDF the customer scrolls through beats a burst of separate images,
+	// and sending it as the message header keeps it above the text.
+	if pdf := strings.TrimSpace(db.GetSetting("menu_pdf")); pdf != "" {
+		sendDocumentWithButtons(phone, publicImageURL(pdf), db.SettingOr("menu_pdf_name", "Menu.pdf"), body, buttons)
+		return
+	}
 	for _, url := range strings.Split(db.GetSetting("menu_images"), "\n") {
 		if url = strings.TrimSpace(url); url != "" {
 			sendImage(phone, publicImageURL(url), "")
 		}
 	}
-	body := renderTemplate(db.SettingOr("menu_body", "☕ *Our Menu*"))
-	sendInteractiveButtons(phone, body, []Button{
-		{ID: ActionBook, Title: db.ButtonLabel(ActionBook, "📅 Book")},
-		{ID: ActionVisit, Title: db.ButtonLabel(ActionVisit, "📍 Visit Us")},
-		{ID: ActionHome, Title: db.ButtonLabel(ActionHome, "🏠 Home")},
-	})
+	sendInteractiveButtons(phone, body, buttons)
 }
 
 // ── Visit ────────────────────────────────────────────────────────────────
@@ -173,7 +184,7 @@ func sendVisit(phone string) {
 	}
 	body := renderTemplate(db.SettingOr("visit_body", "📍 *Visit us* in RR Nagar, Bengaluru."))
 	sendInteractiveButtons(phone, body, []Button{
-		{ID: ActionBook, Title: db.ButtonLabel(ActionBook, "📅 Book")},
+		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},
 		{ID: ActionMenu, Title: db.ButtonLabel(ActionMenu, "☕ Menu")},
 		{ID: ActionHome, Title: db.ButtonLabel(ActionHome, "🏠 Home")},
 	})

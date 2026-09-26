@@ -50,7 +50,7 @@ const (
 	cafeHours = "8 AM – 9 PM"
 )
 
-const mapsLink = "https://www.google.com/maps/search/?api=1&query=Connect+Speciality+Coffee+Roasters+Rajarajeshwari+Nagar+Bengaluru"
+const mapsLink = "https://www.google.com/maps/search/?api=1&query=1565%2C+1st+Cross+Road%2C+Rajarajeshwari+Nagar%2C+Bengaluru%2C+Karnataka+560098"
 
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
@@ -68,7 +68,11 @@ var defaultSettings = map[string]string{
 	// ── Menu ─────────────────────────────────────────────────────────────
 	// One image address per line; each is sent as its own photo.
 	"menu_images": placeholderMenu1 + "\n" + placeholderMenu2,
-	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the photos above.\n\nFancy a seat? Book a table below 👇",
+	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the menu above.\n\nTap 🎁 *Offers* for what's on right now 👇",
+	// Set menu_pdf to send the whole menu as one file instead of menu_images.
+	"offers_empty":  "🎁 No offers running right now. Check back soon!\n\nMeanwhile, have a look at our menu 👇",
+	"menu_pdf":      "",
+	"menu_pdf_name": "Connect Menu.pdf",
 
 	// ── Booking ──────────────────────────────────────────────────────────
 	"booking_intro": "📅 *Book with us*\n\n" +
@@ -118,6 +122,7 @@ var defaultSettings = map[string]string{
 	"btn_view_menu":     "☕ Menu",
 	"btn_book":          "📅 Book",
 	"btn_visit":         "📍 Visit Us",
+	"btn_view_offers":   "🎁 Offers",
 	"btn_main_menu":     "🏠 Home",
 	"btn_book_table":    "🪑 Table",
 	"btn_book_workshop": "🎨 Workshop",

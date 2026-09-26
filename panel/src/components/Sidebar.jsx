@@ -9,6 +9,7 @@ import {
   LogOut,
   Radio,
   Settings2,
+  Gift,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -39,7 +40,8 @@ const NAV_ITEMS = [
   // Day-to-day customer contact.
   { to: '/messages', icon: MessageSquare, label: 'Inbox', divider: true },
   { to: '/contacts', icon: Users, label: 'Contacts' },
-  { to: '/campaigns', icon: Radio, label: 'Offers' },
+  { to: '/offers', icon: Gift, label: 'Offers' },
+  { to: '/campaigns', icon: Radio, label: 'Broadcasts' },
 
   // Table and workshop bookings made through the bot.
   { to: '/leads', icon: CalendarCheck, label: 'Bookings', divider: true },

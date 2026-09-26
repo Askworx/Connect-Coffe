@@ -39,20 +39,38 @@ const GROUPS = [
       {
         key: 'welcome_body',
         label: 'Welcome message',
-        help: 'Sent when somebody says hi, with a photo and the Menu / Book / Visit Us buttons.',
+        help: 'Sent when somebody says hi, with a photo and the Menu / Offers / Visit Us buttons.',
         image: 'welcome_image',
         placeholders: ['company'],
       },
       {
         key: 'menu_body',
         label: 'Menu message',
-        help: 'Sent after the menu photos, above the Book / Visit Us buttons.',
+        help: 'Sent after the menu, above the Offers / Visit Us / Home buttons.',
         placeholders: ['company'],
+      },
+      {
+        key: 'offers_empty',
+        label: 'When there are no offers',
+        help: 'Sent when someone taps Offers and nothing is switched on in the Offers page.',
+        placeholders: ['company'],
+      },
+      {
+        key: 'menu_pdf',
+        label: 'Menu PDF',
+        help: 'Link to the menu as one PDF. Customers get a single file they scroll through. Leave empty to send the photos below instead.',
+        plain: true,
+      },
+      {
+        key: 'menu_pdf_name',
+        label: 'Menu PDF file name',
+        help: 'The name customers see on the attachment, ending in .pdf.',
+        plain: true,
       },
       {
         key: 'menu_images',
         label: 'Menu photos',
-        help: 'One photo link per line. Each is sent as its own photo, in this order.',
+        help: 'Used only when no menu PDF is set. One photo link per line, each sent as its own photo, in this order.',
         plain: true,
         multiline: true,
       },
@@ -106,7 +124,7 @@ const GROUPS = [
       {
         key: 'promo_body',
         label: 'Follow-up offer',
-        help: 'Sent with the photo and Book Now / Menu / Stop offers buttons.',
+        help: 'Sent with the photo and Offers / Menu / Stop offers buttons.',
         image: 'promo_image',
         placeholders: ['company'],
       },
@@ -137,7 +155,7 @@ const BUTTON_GROUPS = [
     help: 'On the welcome message and after most replies.',
     buttons: [
       { key: 'view_menu', label: 'Menu' },
-      { key: 'book', label: 'Book' },
+      { key: 'view_offers', label: 'Offers' },
       { key: 'visit', label: 'Visit us' },
       { key: 'main_menu', label: 'Home (back to the welcome message)' },
     ],
@@ -152,11 +170,8 @@ const BUTTON_GROUPS = [
   },
   {
     label: 'Follow-up offer',
-    help: 'Under the automatic follow-up offer.',
-    buttons: [
-      { key: 'book_now', label: 'Book now' },
-      { key: 'opt_out', label: 'Stop offers' },
-    ],
+    help: 'Under the automatic follow-up offer, next to Offers and Menu.',
+    buttons: [{ key: 'opt_out', label: 'Stop offers' }],
   },
 ];
 

@@ -165,3 +165,19 @@ CREATE TABLE IF NOT EXISTS promo_sends (
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_promo_sends_phone ON promo_sends (RIGHT(phone, 10), sent_at);
+
+-- ── Offers ──────────────────────────────────────────────────────────────────
+-- What a customer sees on tapping Offers. Managed from the panel's Offers
+-- page. Unlike campaigns these are not pushed to anyone; they are shown on
+-- request, and only while active and before ends_at.
+CREATE TABLE IF NOT EXISTS offers (
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(120) NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    image_url TEXT NOT NULL DEFAULT '',
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    ends_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

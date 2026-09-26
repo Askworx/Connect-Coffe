@@ -97,6 +97,12 @@ export const createCampaign = (data) => api.post('/campaigns', data);
 export const deleteCampaign = (id) => api.delete(`/campaigns/${id}`);
 export const getCampaignAnalytics = (id) => api.get(`/campaigns/${id}/analytics`);
 
+// Offers — what a customer sees on tapping Offers in the bot
+export const getOffers = () => api.get('/offers');
+export const createOffer = (data) => api.post('/offers', data);
+export const updateOffer = (id, data) => api.put(`/offers/${id}`, data);
+export const deleteOffer = (id) => api.delete(`/offers/${id}`);
+
 // Employee Management
 export const getEmployees = (params) => api.get('/employees', { params });
 export const addEmployee = (data) => api.post('/employees', data);

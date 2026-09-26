@@ -50,7 +50,7 @@ const PAGE_SIZE = 10;
 // What a button under an offer does when tapped. Mirrors posterButtonActions
 // in the bot's scheduler.go, which rejects anything not listed there.
 const BUTTON_ACTIONS = [
-  { value: 'book', label: 'Start a booking' },
+  { value: 'view_offers', label: 'Show current offers' },
   { value: 'view_menu', label: 'Show the menu' },
   { value: 'visit', label: 'Show address & directions' },
   { value: 'main_menu', label: 'Show the welcome message' },
@@ -94,7 +94,7 @@ const TEMPLATES = [
       '📍 *Come say hi!*\n\nFreshly roasted, hand-brewed speciality coffee in RR Nagar 5th Stage. Your table is waiting. ☕',
     buttons: [
       { id: 'visit', title: '📍 Get Directions' },
-      { id: 'book', title: '📅 Book a Table' },
+      { id: 'view_offers', title: '🎁 See Offers' },
     ],
   },
   {
@@ -113,9 +113,9 @@ const TEMPLATES = [
     label: '🎨 Workshop',
     image: photo('1497935586351-b67a49e012bf'),
     caption:
-      '🎨 *Coffee painting workshop*\n\nPaint with coffee and sip while you create — ₹649 a seat. Limited seats this weekend!\n\nTap *Book Now* to save yours.',
+      '🎨 *Coffee painting workshop*\n\nPaint with coffee and sip while you create — ₹649 a seat. Limited seats this weekend!\n\nReply here to save yours.',
     buttons: [
-      { id: 'book', title: '📅 Book Now' },
+      { id: 'view_offers', title: '🎁 See Offers' },
       { id: 'visit', title: '📍 Visit Us' },
     ],
   },
@@ -137,7 +137,7 @@ const TEMPLATES = [
     caption:
       '🥳 *Weekend special*\n\nBring a friend this weekend — *buy one, get the second at 50% off* on all hot coffees.',
     buttons: [
-      { id: 'book', title: '📅 Book a Table' },
+      { id: 'view_offers', title: '🎁 See Offers' },
       { id: 'view_menu', title: '☕ See Menu' },
     ],
   },
@@ -158,7 +158,7 @@ const emptyOffer = () => ({
   caption: '',
   scheduled_at: '',
   buttons: [
-    { id: 'book', title: '📅 Book Now' },
+    { id: 'view_offers', title: '🎁 See Offers' },
     { id: 'view_menu', title: '☕ See Menu' },
   ],
 });
@@ -422,7 +422,7 @@ export default function Campaigns() {
     <>
       <PageHeader
         eyebrow="Marketing"
-        title="Offers"
+        title="Broadcasts"
         intro="Send an offer — a photo, a few lines and buttons to tap — to everyone who messaged Connect in the last 24 hours. Inside that window WhatsApp delivers it for free."
         action={
           <Button onClick={() => openComposer()}>
@@ -712,7 +712,7 @@ export default function Campaigns() {
                             aria-label={`Button ${index + 1} text`}
                             value={button.title}
                             onChange={(e) => setButton(index, 'title', e.target.value)}
-                            placeholder="📅 Book Now"
+                            placeholder="🎁 See Offers"
                             aria-invalid={!!errors.buttons && (!button.title.trim() || tooLong)}
                           />
                           <p className={`font-mono text-[11px] tabular-nums ${tooLong ? 'text-danger' : 'text-text-secondary'}`}>

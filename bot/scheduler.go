@@ -56,7 +56,7 @@ func sendDuePromos() {
 	image := publicImageURL(db.GetSetting("promo_image"))
 	body := renderTemplate(db.SettingOr("promo_body", "🎁 A little welcome gift from {{company}}!"))
 	buttons := []Button{
-		{ID: ActionBook, Title: db.ButtonLabel("book_now", "📅 Book Now")},
+		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},
 		{ID: ActionMenu, Title: db.ButtonLabel(ActionMenu, "☕ Menu")},
 		{ID: ActionOptOut, Title: db.ButtonLabel(ActionOptOut, "🛑 Stop offers")},
 	}
@@ -197,10 +197,11 @@ func broadcastQuiz(camp db.Campaign, phones []string) {
 // by handleMessage whatever state the conversation is in. The panel offers
 // the same list.
 var posterButtonActions = map[string]bool{
-	ActionHome:  true, // welcome message
-	ActionMenu:  true, // menu photos
-	ActionBook:  true, // booking
-	ActionVisit: true, // address and directions
+	ActionHome:   true, // welcome message
+	ActionMenu:   true, // menu
+	ActionOffers: true, // current offers
+	ActionVisit:  true, // address and directions
+	ActionBook:   true, // booking; kept so posters saved with it still send
 }
 
 // validateCampaignButtons returns a reason the buttons cannot be sent, or ""
@@ -245,7 +246,7 @@ func broadcastPoster(camp db.Campaign, phones []string) {
 	}
 
 	buttons := []Button{
-		{ID: ActionBook, Title: db.ButtonLabel(ActionBook, "📅 Book")},
+		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},
 		{ID: ActionMenu, Title: db.ButtonLabel(ActionMenu, "☕ Menu")},
 	}
 	if len(camp.Buttons) > 0 {

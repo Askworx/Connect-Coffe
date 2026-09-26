@@ -21,6 +21,7 @@ import Leads from './pages/Leads';
 import Contacts from './pages/Contacts';
 import Messages from './pages/Messages';
 import Campaigns from './pages/Campaigns';
+import Offers from './pages/Offers';
 
 // Internal Management Pages
 import BotConfig from './pages/BotConfig';
@@ -104,6 +105,7 @@ const ROUTES = [
   { path: '/', element: <Dashboard /> },
   { path: '/messages', element: <Messages /> },
   { path: '/contacts', element: <Contacts /> },
+  { path: '/offers', element: <Offers /> },
   { path: '/campaigns', element: <Campaigns /> },
   { path: '/leads', element: <Leads /> },
   { path: '/config', element: <BotConfig /> },

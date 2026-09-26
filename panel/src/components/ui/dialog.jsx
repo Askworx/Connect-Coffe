@@ -19,11 +19,19 @@ function Dialog({ open, onClose, children, size = "md", labelledBy }) {
   const panelRef = React.useRef(null);
   const reduced = useReducedMotion();
 
+  // Callers pass a fresh onClose every render. Reading it through a ref keeps
+  // the effect below tied to `open` alone; otherwise each keystroke in a field
+  // re-runs it and focus jumps out of the field to the panel.
+  const onCloseRef = React.useRef(onClose);
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   React.useEffect(() => {
     if (!open) return undefined;
 
     const onKeyDown = (event) => {
-      if (event.key === "Escape") onClose?.();
+      if (event.key === "Escape") onCloseRef.current?.();
     };
     document.addEventListener("keydown", onKeyDown);
 
@@ -38,7 +46,7 @@ function Dialog({ open, onClose, children, size = "md", labelledBy }) {
       document.body.style.overflow = previousOverflow;
       if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const widths = {
     sm: "max-w-md",
