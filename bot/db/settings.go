@@ -50,7 +50,7 @@ const (
 	cafeHours = "8 AM – 9 PM"
 )
 
-const mapsLink = "https://www.google.com/maps/search/?api=1&query=Connect+Speciality+Coffee+Roasters+Rajarajeshwari+Nagar+Bengaluru"
+const mapsLink = "https://www.google.com/maps/search/?api=1&query=1565%2C+1st+Cross+Road%2C+Rajarajeshwari+Nagar%2C+Bengaluru%2C+Karnataka+560098"
 
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
