@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"time"
 
@@ -21,6 +22,10 @@ func InitDB() error {
 	if err != nil {
 		return err
 	}
+	// Host/port/database only — never the credentials — so a misconfigured
+	// DATABASE_URL (e.g. still pointing at a local Postgres) is obvious in the
+	// deploy logs without leaking anything.
+	log.Printf("connecting to database %s:%d/%s", config.ConnConfig.Host, config.ConnConfig.Port, config.ConnConfig.Database)
 
 	Pool, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {

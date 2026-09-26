@@ -73,7 +73,12 @@ func isProduction() bool {
 }
 
 func main() {
-	godotenv.Load()
+	// Railway (and any real deployment) injects DATABASE_URL directly into the
+	// process environment. bot/.env is a local-dev convenience only — it must
+	// never load over a value the platform already supplied.
+	if os.Getenv("DATABASE_URL") == "" {
+		godotenv.Load()
+	}
 
 	// ── Refuse to start misconfigured ────────────────────────────────────
 	required := []string{"DATABASE_URL", "SESSION_SECRET"}
