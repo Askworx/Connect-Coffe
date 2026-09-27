@@ -71,5 +71,8 @@ func InitDB() error {
 		)
 	`)
 
+	// Needs the offers table, which the migration creates.
+	seedDraftOffers()
+
 	return Pool.Ping(context.Background())
 }
