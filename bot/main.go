@@ -113,6 +113,7 @@ func main() {
 		log.Fatalf("Refusing to start: %v", err)
 	}
 
+	seedUploads()
 	InitScheduler()
 
 	// ── Router ───────────────────────────────────────────────────────────
