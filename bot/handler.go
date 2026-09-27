@@ -32,6 +32,7 @@ const (
 	ActionMenu     = "view_menu"
 	ActionBook     = "book"
 	ActionOffers   = "view_offers"
+	ActionClaim    = "claim_offer" // sent as "claim_offer:<offer id>"
 	ActionVisit    = "visit"
 	ActionTable    = "book_table"
 	ActionWorkshop = "book_workshop"
@@ -105,6 +106,9 @@ func handleMessage(phone, input string, lat, lng float64) {
 		return
 	case text == "offer" || text == "offers" || text == "deals" || input == ActionOffers:
 		sendOffers(phone)
+		return
+	case input == ActionClaim || strings.HasPrefix(input, ActionClaim+":"):
+		sendClaim(phone, strings.TrimPrefix(strings.TrimPrefix(input, ActionClaim), ":"))
 		return
 	}
 

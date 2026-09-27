@@ -70,7 +70,12 @@ var defaultSettings = map[string]string{
 	"menu_images": placeholderMenu1 + "\n" + placeholderMenu2,
 	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the menu above.\n\nTap 🎁 *Offers* for what's on right now 👇",
 	// Set menu_pdf to send the whole menu as one file instead of menu_images.
-	"offers_empty":  "🎁 No offers running right now. Check back soon!\n\nMeanwhile, have a look at our menu 👇",
+	"offers_empty": "🎁 No offers running right now. Check back soon!\n\nMeanwhile, have a look at our menu 👇",
+	"offer_claimed": "🎉 *Thank you for claiming {{offer}}!*\n\n" +
+		"Come visit us and show this message at the counter — we'll be waiting for you ☕\n\n" +
+		"📍 " + cafeAddress + "\n\n" +
+		"🕐 Open " + cafeHours + "\n" +
+		"🗺️ Directions: " + mapsLink,
 	"menu_pdf":      "",
 	"menu_pdf_name": "Connect Menu.pdf",
 

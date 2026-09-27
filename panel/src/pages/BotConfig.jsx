@@ -56,6 +56,12 @@ const GROUPS = [
         placeholders: ['company'],
       },
       {
+        key: 'offer_claimed',
+        label: 'After tapping Claim',
+        help: '{{offer}} becomes the offer’s title. The map pin from Visit us is sent just before it.',
+        placeholders: ['offer', 'company'],
+      },
+      {
         key: 'menu_pdf',
         label: 'Menu PDF',
         help: 'Link to the menu as one PDF. Customers get a single file they scroll through. Leave empty to send the photos below instead.',
@@ -156,6 +162,7 @@ const BUTTON_GROUPS = [
     buttons: [
       { key: 'view_menu', label: 'Menu' },
       { key: 'view_offers', label: 'Offers' },
+      { key: 'claim_offer', label: 'Claim (on each offer)' },
       { key: 'visit', label: 'Visit us' },
       { key: 'main_menu', label: 'Home (back to the welcome message)' },
     ],
