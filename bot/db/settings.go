@@ -111,8 +111,9 @@ var defaultSettings = map[string]string{
 	// ── The follow-up promotion ──────────────────────────────────────────
 	// Sent once, promo_delay_minutes after someone starts chatting, while
 	// their free 24-hour window is still open. Not again for
-	// promo_repeat_days. Set promo_enabled to "off" to stop it.
-	"promo_enabled":       "on",
+	// promo_repeat_days. Off unless the cafe turns it on: the owner wants
+	// every offer to go out from the Offers page, where the admin controls it.
+	"promo_enabled":       "off",
 	"promo_delay_minutes": "60",
 	"promo_repeat_days":   "30",
 	"promo_image":         placeholderPromo,
