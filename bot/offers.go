@@ -50,8 +50,7 @@ func offerCaption(o db.Offer) string {
 	return caption
 }
 
-// sendOffers shows the live offers. The last one carries the buttons, so they
-// sit under the whole list rather than arriving ahead of the photos.
+// sendOffers shows the live offers, each with the Menu / Visit Us / Home buttons.
 func sendOffers(phone string) {
 	resetConversation(phone)
 	buttons := []Button{
@@ -68,21 +67,17 @@ func sendOffers(phone string) {
 			"🎁 No offers running right now. Check back soon!")), buttons)
 		return
 	}
+	// Every offer carries the buttons, not just the last: sent as a bare photo,
+	// an earlier offer looked broken next to the one below it, and a customer
+	// who stops scrolling at the first offer still has somewhere to go.
 	for i, o := range offers {
 		caption := offerCaption(o)
-		image := publicImageURL(o.ImageURL)
-		last := i == len(offers)-1
-		switch {
-		case last && image != "":
+		if image := publicImageURL(o.ImageURL); image != "" {
 			sendImageWithButtons(phone, image, caption, buttons)
-		case last:
+		} else {
 			sendInteractiveButtons(phone, caption, buttons)
-		case image != "":
-			sendImage(phone, image, caption)
-		default:
-			sendTextMessage(phone, caption)
 		}
-		if !last {
+		if i < len(offers)-1 {
 			// Meta fetches each photo before delivering it; a short gap keeps
 			// the offers arriving in the order they are listed.
 			time.Sleep(time.Second)
