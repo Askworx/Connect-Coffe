@@ -50,7 +50,9 @@ const (
 	cafeHours = "8 AM – 9 PM"
 )
 
-const mapsLink = "https://www.google.com/maps/search/?api=1&query=1565%2C+1st+Cross+Road%2C+Rajarajeshwari+Nagar%2C+Bengaluru%2C+Karnataka+560098"
+// Directions to the cafe's own Google Maps listing (the place id is in the
+// data= part), from the owner. The pin below is the same listing's position.
+const mapsLink = "https://www.google.com/maps/dir//Connect+Speciality+Coffee+Roasters,+BEML,+1565,+Raghavendra+Arcade,+Ground+Floor,+6th+main,+1st+cross,+2nd+Main+Rd,+near+Rajsri+Apartment+Block-B,+Durga+Parameshwari+Layout,+5th+Stage,+Rajarajeshwari+Nagar,+Bengaluru,+Karnataka+560098/data=!4m8!4m7!1m0!1m5!1m1!1s0x3bae3fb0fb502143:0x4ef9eb80e53306ea!2m2!1d77.513829!2d12.9177026"
 
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
@@ -99,8 +101,8 @@ var defaultSettings = map[string]string{
 		"📸 Instagram: https://www.instagram.com/connect_roasters/",
 	// A tappable map pin is sent when both are set. Left empty until the
 	// cafe's exact coordinates are copied from its Google Maps listing.
-	"location_lat":  "",
-	"location_lng":  "",
+	"location_lat":  "12.9177026",
+	"location_lng":  "77.513829",
 	"location_name": "Connect Speciality Coffee Roasters",
 
 	// ── Anything the bot does not recognise ──────────────────────────────
