@@ -48,6 +48,16 @@ func LiveOffers(limit int) ([]Offer, error) {
 		ORDER BY sort_order, created_at DESC LIMIT $1`, limit)
 }
 
+// GetOffer returns one offer, live or not, so a Claim tapped on an older
+// message still names the offer it was for.
+func GetOffer(id int) (Offer, bool) {
+	offers, err := scanOffers(`SELECT `+offerColumns+` FROM offers WHERE id = $1`, id)
+	if err != nil || len(offers) == 0 {
+		return Offer{}, false
+	}
+	return offers[0], true
+}
+
 func CreateOffer(o Offer) (int, error) {
 	var id int
 	err := Pool.QueryRow(context.Background(),

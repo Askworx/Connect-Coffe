@@ -57,6 +57,12 @@ const GROUPS = [
         placeholders: ['company'],
       },
       {
+        key: 'offer_claimed',
+        label: 'After tapping Claim',
+        help: '{{offer}} becomes the offer’s title. The map pin from Visit us is sent just before it.',
+        placeholders: ['offer', 'company'],
+      },
+      {
         key: 'menu_pdf',
         label: 'Menu PDF',
         help: 'Link to the menu as one PDF. Customers get a single file they scroll through. Leave empty to send the photos below instead.',
@@ -120,7 +126,7 @@ const GROUPS = [
     id: 'promotion',
     label: 'Follow-up offer',
     blurb:
-      'Sent automatically a set time after someone first messages, while they are still inside the free 24-hour window. Each person gets it once per repeat period.',
+      'Off by default — offers go out from the Offers page instead. When turned on, it is sent automatically a set time after someone first messages, while they are still inside the free 24-hour window, once per repeat period.',
     fields: [
       {
         key: 'promo_body',
@@ -157,6 +163,7 @@ const BUTTON_GROUPS = [
     buttons: [
       { key: 'view_menu', label: 'Menu' },
       { key: 'view_offers', label: 'Offers' },
+      { key: 'claim_offer', label: 'Claim (on each offer)' },
       { key: 'visit', label: 'Visit us' },
       { key: 'main_menu', label: 'Home (back to the welcome message)' },
     ],
