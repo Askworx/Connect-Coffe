@@ -7,7 +7,6 @@ import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
 import ConfirmModal from '../components/ConfirmModal';
 import WhatsAppPreview, { FormattingHint } from '../components/WhatsAppPreview';
-import WhatsAppQRCode from '../components/WhatsAppQRCode';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
@@ -191,7 +190,6 @@ const AREAS = [
   { value: 'messages', label: 'Messages' },
   { value: 'replies', label: 'Auto-replies' },
   { value: 'buttons', label: 'Buttons' },
-  { value: 'qr', label: 'QR code' },
 ];
 
 const BotConfig = () => {
@@ -512,46 +510,6 @@ const BotConfig = () => {
             </Reveal>
           ))}
         </div>
-      )}
-
-      {/* ── QR code ──────────────────────────────────────────────────────── */}
-      {area === 'qr' && (
-        <Reveal delay={0.04}>
-          <div className="overflow-hidden rounded-xl border border-border bg-white shadow-card">
-            <div className="border-b border-border px-5 py-4">
-              <h2 className="font-heading text-base font-bold uppercase tracking-tight text-ink">
-                Counter QR code
-              </h2>
-              <p className="mt-2 max-w-[62ch] text-[13px] leading-relaxed text-text-secondary">
-                Scanning this opens WhatsApp with <strong>“Hi”</strong> already typed into the
-                message box — the customer still has to tap send themselves. Print it for the
-                counter or a table tent.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 p-5 lg:grid-cols-2">
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Label htmlFor="whatsapp_qr_number">WhatsApp number</Label>
-                  {changed.includes('whatsapp_qr_number') && <Badge variant="warning">Unsaved</Badge>}
-                </div>
-                <Input
-                  id="whatsapp_qr_number"
-                  value={settings.whatsapp_qr_number || ''}
-                  onChange={(event) => setField('whatsapp_qr_number', event.target.value)}
-                  placeholder="91 96067 52452"
-                  className="sm:max-w-[20rem]"
-                />
-                <p className="text-[12px] leading-relaxed text-text-secondary">
-                  Country code first, e.g. <code className="font-mono text-ink">91</code> for
-                  India. Spaces and + are fine to type — only the digits are used in the QR code.
-                </p>
-              </div>
-
-              <WhatsAppQRCode number={settings.whatsapp_qr_number} />
-            </div>
-          </div>
-        </Reveal>
       )}
 
       {/* ── Auto-replies ─────────────────────────────────────────────────── */}

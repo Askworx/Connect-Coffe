@@ -54,16 +54,6 @@ const (
 // data= part), from the owner. The pin below is the same listing's position.
 const mapsLink = "https://www.google.com/maps/dir//Connect+Speciality+Coffee+Roasters,+BEML,+1565,+Raghavendra+Arcade,+Ground+Floor,+6th+main,+1st+cross,+2nd+Main+Rd,+near+Rajsri+Apartment+Block-B,+Durga+Parameshwari+Layout,+5th+Stage,+Rajarajeshwari+Nagar,+Bengaluru,+Karnataka+560098/data=!4m8!4m7!1m0!1m5!1m1!1s0x3bae3fb0fb502143:0x4ef9eb80e53306ea!2m2!1d77.513829!2d12.9177026"
 
-func digitsOnly(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		if r >= '0' && r <= '9' {
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
-}
-
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
 	"welcome_image": placeholderWelcome,
@@ -131,7 +121,6 @@ var defaultSettings = map[string]string{
 
 	// ── Broadcasts ───────────────────────────────────────────────────────
 	"poster_footer": "📍 RR Nagar 5th Stage, Bengaluru\n📸 @connect_roasters",
-	"whatsapp_qr_number": digitsOnly(cafePhone),
 
 	// ── Subscriptions ────────────────────────────────────────────────────
 	"optout_done": "✅ Done — you won't get offers or updates from us any more. Say *hi* any time to chat again.",
