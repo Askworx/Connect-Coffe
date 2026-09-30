@@ -52,6 +52,16 @@ const (
 
 const mapsLink = "https://www.google.com/maps/search/?api=1&query=1565%2C+1st+Cross+Road%2C+Rajarajeshwari+Nagar%2C+Bengaluru%2C+Karnataka+560098"
 
+func digitsOnly(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
 	"welcome_image": placeholderWelcome,
@@ -113,6 +123,7 @@ var defaultSettings = map[string]string{
 
 	// ── Broadcasts ───────────────────────────────────────────────────────
 	"poster_footer": "📍 RR Nagar 5th Stage, Bengaluru\n📸 @connect_roasters",
+	"whatsapp_qr_number": digitsOnly(cafePhone),
 
 	// ── Subscriptions ────────────────────────────────────────────────────
 	"optout_done": "✅ Done — you won't get offers or updates from us any more. Say *hi* any time to chat again.",
