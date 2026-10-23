@@ -119,9 +119,6 @@ var defaultSettings = map[string]string{
 	"promo_image":         placeholderPromo,
 	"promo_body":          "🎁 *A little welcome gift*\n\nShow this message at the counter on your first visit and get *10% off* your order. ☕\n\nSee you at Connect!",
 
-	// ── Broadcasts ───────────────────────────────────────────────────────
-	"poster_footer": "📍 RR Nagar 5th Stage, Bengaluru\n📸 @connect_roasters",
-
 	// ── Subscriptions ────────────────────────────────────────────────────
 	"optout_done": "✅ Done — you won't get offers or updates from us any more. Say *hi* any time to chat again.",
 	"optin_done":  "✅ You're subscribed again. We'll share offers and new roasts now and then ☕",

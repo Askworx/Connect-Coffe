@@ -142,9 +142,8 @@ const GROUPS = [
   {
     id: 'other',
     label: 'Offers & subscriptions',
-    blurb: 'The line added under every offer, and the replies to STOP and SUBSCRIBE.',
+    blurb: 'The replies to STOP and SUBSCRIBE.',
     fields: [
-      { key: 'poster_footer', label: 'Under every offer', help: 'Added below the message of every offer you send.' },
       { key: 'optout_done', label: 'After STOP', help: 'Sent when a customer stops offers.' },
       { key: 'optin_done', label: 'After SUBSCRIBE', help: 'Sent when a customer turns offers back on.' },
     ],

@@ -246,12 +246,6 @@ func broadcastPoster(camp db.Campaign, phones []string) {
 	image := publicImageURL(camp.ImageURL)
 
 	caption := strings.TrimSpace(camp.Caption)
-	if footer := db.GetSetting("poster_footer"); footer != "" {
-		if caption != "" {
-			caption += "\n\n"
-		}
-		caption += footer
-	}
 
 	buttons := []Button{
 		{ID: ActionOffers, Title: db.ButtonLabel(ActionOffers, "🎁 Offers")},

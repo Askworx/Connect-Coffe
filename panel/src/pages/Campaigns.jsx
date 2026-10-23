@@ -17,7 +17,6 @@ import {
   deleteCampaign,
   uploadImage,
   getContacts,
-  getSettings,
 } from '../api';
 import { getBroadcastStatus } from '../lib/broadcastStatus';
 import { isInWindow } from '../lib/replyWindow';
@@ -206,7 +205,6 @@ export default function Campaigns() {
   // Who a broadcast reaches: subscribed contacts inside the 24-hour window,
   // the same rule the bot applies when it sends.
   const [audience, setAudience] = useState(null); // { reachable, subscribed }
-  const [footer, setFooter] = useState('');
 
   const [composerOpen, setComposerOpen] = useState(false);
   const [form, setForm] = useState(emptyOffer);
@@ -275,9 +273,6 @@ export default function Campaigns() {
 
   useEffect(() => {
     loadAudience();
-    getSettings()
-      .then(({ data }) => setFooter(data?.poster_footer || ''))
-      .catch(() => setFooter(''));
   }, [loadAudience]);
 
   // Free the object URL behind an uploaded photo's preview.
@@ -423,7 +418,7 @@ export default function Campaigns() {
     } — the ones who messaged in the last 24 hours.`;
   }, [audience]);
 
-  const previewCaption = [form.caption.trim(), footer.trim()].filter(Boolean).join('\n\n');
+  const previewCaption = form.caption.trim();
   const previewImage = uploadSource === 'local' ? localPreview : form.image_url.trim();
 
   return (
