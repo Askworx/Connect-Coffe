@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -101,7 +102,14 @@ func settingInt(key string, def, min, max int) int {
 func publicImageURL(raw string) string {
 	raw = strings.TrimSpace(raw)
 	if i := strings.Index(raw, "/uploads/"); i >= 0 {
-		return strings.TrimRight(os.Getenv("PUBLIC_URL"), "/") + "/api/uploads/" + path.Base(raw[i:])
+		// Escape the name: files uploaded before names were sanitised can hold
+		// spaces or the narrow no-break space macOS puts in screenshot names,
+		// and Meta fetches an unescaped one as a plain space and gets a 404.
+		name := path.Base(raw[i:])
+		if unescaped, err := url.PathUnescape(name); err == nil {
+			name = unescaped
+		}
+		return strings.TrimRight(os.Getenv("PUBLIC_URL"), "/") + "/api/uploads/" + url.PathEscape(name)
 	}
 	return raw
 }

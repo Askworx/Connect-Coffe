@@ -50,7 +50,9 @@ const (
 	cafeHours = "8 AM – 9 PM"
 )
 
-const mapsLink = "https://www.google.com/maps/search/?api=1&query=1565%2C+1st+Cross+Road%2C+Rajarajeshwari+Nagar%2C+Bengaluru%2C+Karnataka+560098"
+// Directions to the cafe's own Google Maps listing (the place id is in the
+// data= part), from the owner. The pin below is the same listing's position.
+const mapsLink = "https://www.google.com/maps/dir//Connect+Speciality+Coffee+Roasters,+BEML,+1565,+Raghavendra+Arcade,+Ground+Floor,+6th+main,+1st+cross,+2nd+Main+Rd,+near+Rajsri+Apartment+Block-B,+Durga+Parameshwari+Layout,+5th+Stage,+Rajarajeshwari+Nagar,+Bengaluru,+Karnataka+560098/data=!4m8!4m7!1m0!1m5!1m1!1s0x3bae3fb0fb502143:0x4ef9eb80e53306ea!2m2!1d77.513829!2d12.9177026"
 
 var defaultSettings = map[string]string{
 	// ── Welcome ──────────────────────────────────────────────────────────
@@ -70,7 +72,12 @@ var defaultSettings = map[string]string{
 	"menu_images": placeholderMenu1 + "\n" + placeholderMenu2,
 	"menu_body":   "☕ *Our Menu*\n\nEverything we serve is in the menu above.\n\nTap 🎁 *Offers* for what's on right now 👇",
 	// Set menu_pdf to send the whole menu as one file instead of menu_images.
-	"offers_empty":  "🎁 No offers running right now. Check back soon!\n\nMeanwhile, have a look at our menu 👇",
+	"offers_empty": "🎁 No offers running right now. Check back soon!\n\nMeanwhile, have a look at our menu 👇",
+	"offer_claimed": "🎉 *Thank you for claiming {{offer}}!*\n\n" +
+		"Come visit us and show this message at the counter — we'll be waiting for you ☕\n\n" +
+		"📍 " + cafeAddress + "\n\n" +
+		"🕐 Open " + cafeHours + "\n" +
+		"🗺️ Directions: " + mapsLink,
 	"menu_pdf":      "",
 	"menu_pdf_name": "Connect Menu.pdf",
 
@@ -94,8 +101,8 @@ var defaultSettings = map[string]string{
 		"📸 Instagram: https://www.instagram.com/connect_roasters/",
 	// A tappable map pin is sent when both are set. Left empty until the
 	// cafe's exact coordinates are copied from its Google Maps listing.
-	"location_lat":  "",
-	"location_lng":  "",
+	"location_lat":  "12.9177026",
+	"location_lng":  "77.513829",
 	"location_name": "Connect Speciality Coffee Roasters",
 
 	// ── Anything the bot does not recognise ──────────────────────────────
@@ -104,8 +111,9 @@ var defaultSettings = map[string]string{
 	// ── The follow-up promotion ──────────────────────────────────────────
 	// Sent once, promo_delay_minutes after someone starts chatting, while
 	// their free 24-hour window is still open. Not again for
-	// promo_repeat_days. Set promo_enabled to "off" to stop it.
-	"promo_enabled":       "on",
+	// promo_repeat_days. Off unless the cafe turns it on: the owner wants
+	// every offer to go out from the Offers page, where the admin controls it.
+	"promo_enabled":       "off",
 	"promo_delay_minutes": "60",
 	"promo_repeat_days":   "30",
 	"promo_image":         placeholderPromo,

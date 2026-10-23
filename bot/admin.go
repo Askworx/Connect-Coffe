@@ -73,8 +73,7 @@ func AdminRoutes() chi.Router {
 			return
 		}
 
-		safeFilename := strings.ReplaceAll(handler.Filename, " ", "_")
-		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), filepath.Base(safeFilename))
+		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeUploadName(handler.Filename))
 		dst, err := os.Create(filepath.Join(uploadDir, filename))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -235,6 +234,30 @@ func AdminRoutes() chi.Router {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
+	})
+
+	r.Post("/contacts/subscribe-all", func(w http.ResponseWriter, r *http.Request) {
+		updated, err := db.UpdateAllContactsOptOut(false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct {
+			Updated int64 `json:"updated"`
+		}{Updated: updated})
+	})
+
+	r.Post("/contacts/unsubscribe-all", func(w http.ResponseWriter, r *http.Request) {
+		updated, err := db.UpdateAllContactsOptOut(true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct {
+			Updated int64 `json:"updated"`
+		}{Updated: updated})
 	})
 
 	r.Post("/contacts/{id}/opt-out", func(w http.ResponseWriter, r *http.Request) {
@@ -580,4 +603,25 @@ func normalisePhone(raw string) (string, bool) {
 		return "", false
 	}
 	return d, true
+}
+
+// safeUploadName keeps only letters, digits, dots, dashes and underscores.
+// Replacing just the ASCII space was not enough: macOS screenshot names put a
+// narrow no-break space before "AM"/"PM", which survived into the saved name,
+// and Meta then fetched the image with a plain space and got a 404.
+func safeUploadName(name string) string {
+	name = filepath.Base(name)
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '-', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	if s := strings.Trim(b.String(), "."); s != "" {
+		return s
+	}
+	return "upload"
 }

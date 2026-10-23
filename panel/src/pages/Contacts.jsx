@@ -1,9 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format, formatDistanceToNow, parseISO } from 'date-fns';
-import { UserPlus, Search, MessageSquare, Trash2, AlertCircle, Send, FileUp } from 'lucide-react';
+import { UserPlus, Search, MessageSquare, Trash2, AlertCircle, Send, FileUp, Bell, BellOff } from 'lucide-react';
 
-import { getContacts, saveContact, sendMessage, deleteContact, toggleOptOut } from '../api';
+import {
+  getContacts,
+  saveContact,
+  sendMessage,
+  deleteContact,
+  toggleOptOut,
+  subscribeAllContacts,
+  unsubscribeAllContacts,
+} from '../api';
 import { formatSlug } from '../utils';
 
 import PageHeader from '../components/PageHeader';
@@ -74,6 +82,8 @@ const Contacts = () => {
   const [sending, setSending] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [pendingOptOut, setPendingOptOut] = useState(null);
+  const [confirmBulkOptOut, setConfirmBulkOptOut] = useState(null); // 'subscribe' | 'unsubscribe' | null
+  const [bulkOptOutInFlight, setBulkOptOutInFlight] = useState(false);
 
   const notify = (title, message, type = 'success') =>
     setModal({ open: true, title, message, type });
@@ -205,6 +215,36 @@ const Contacts = () => {
     }
   };
 
+  const handleBulkOptOut = async (optOut) => {
+    if (bulkOptOutInFlight) return;
+    setBulkOptOutInFlight(true);
+
+    try {
+      const { data } = await (optOut ? unsubscribeAllContacts() : subscribeAllContacts());
+      await load();
+      const count = data?.updated ?? 0;
+      notify(
+        optOut ? 'Contacts opted out' : 'Contacts subscribed',
+        count > 0
+          ? `${count} ${count === 1 ? 'contact' : 'contacts'} ${
+              optOut ? 'will no longer receive' : 'will now receive'
+            } broadcasts.`
+          : optOut
+            ? 'Everyone was already opted out.'
+            : 'Everyone was already subscribed.',
+      );
+    } catch (err) {
+      console.error(err);
+      notify(
+        optOut ? 'Could not opt everyone out' : 'Could not subscribe everyone',
+        'Nothing was changed. Please try again.',
+        'error',
+      );
+    } finally {
+      setBulkOptOutInFlight(false);
+    }
+  };
+
   const openMessage = (contact) => {
     setMessageTarget(contact);
     setMessageBody('');
@@ -244,6 +284,22 @@ const Contacts = () => {
             : ''
         }
         confirmText="Delete contact"
+      />
+
+      <ConfirmModal
+        isOpen={!!confirmBulkOptOut}
+        onClose={() => setConfirmBulkOptOut(null)}
+        onConfirm={() => handleBulkOptOut(confirmBulkOptOut === 'unsubscribe')}
+        type={confirmBulkOptOut === 'unsubscribe' ? 'danger' : 'success'}
+        title={
+          confirmBulkOptOut === 'unsubscribe' ? 'Opt out every contact?' : 'Subscribe every contact?'
+        }
+        message={
+          confirmBulkOptOut === 'unsubscribe'
+            ? 'Every contact will be opted out and skipped automatically on every future broadcast. You can subscribe everyone again at any time.'
+            : 'Every contact will be opted back in and included in your next broadcast, once inside their free 24-hour window.'
+        }
+        confirmText={confirmBulkOptOut === 'unsubscribe' ? 'Opt out all' : 'Subscribe all'}
       />
 
       <PageHeader
@@ -335,6 +391,27 @@ const Contacts = () => {
         <p className="mb-6 text-[13px] leading-relaxed text-text-secondary">
           {activeFilter.help}
         </p>
+
+        <div className="mb-6 flex flex-wrap justify-end gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkOptOutInFlight}
+            onClick={() => setConfirmBulkOptOut('subscribe')}
+          >
+            <Bell />
+            Subscribe all
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkOptOutInFlight}
+            onClick={() => setConfirmBulkOptOut('unsubscribe')}
+          >
+            <BellOff />
+            OPTED OUT
+          </Button>
+        </div>
       </Reveal>
 
       <Reveal delay={0.08}>

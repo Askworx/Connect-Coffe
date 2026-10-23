@@ -456,7 +456,7 @@ export default function Offers() {
                 <WhatsAppPreview
                   message={previewCaption(form)}
                   image={previewImage}
-                  buttons={[{ title: '☕ Menu' }, { title: '📍 Visit Us' }, { title: '🏠 Home' }]}
+                  buttons={[{ title: '🎉 Claim' }, { title: '🏠 Home' }]}
                   empty="Write a title to see the offer here."
                 />
               </div>

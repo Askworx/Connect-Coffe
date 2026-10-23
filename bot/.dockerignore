@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+uploads/
+connect-bot
+*.exe
+*.test
+*.prof
+.git
+.gitignore
