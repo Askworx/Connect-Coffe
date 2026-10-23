@@ -151,16 +151,21 @@ func sendDueCampaigns() {
 		// With nobody in the window the campaign is still marked sent, to 0.
 		// Leaving it due would fire it at whatever minute the next person
 		// happened to message, to that one person.
+		sent := 0
 		if len(phones) > 0 {
 			switch strings.ToLower(camp.Type) {
 			case "quiz":
 				broadcastQuiz(camp, phones)
+				sent = len(phones)
 			case "poster":
-				broadcastPoster(camp, phones)
+				sent = broadcastPoster(camp, phones)
 			}
 		}
+		if strings.ToLower(camp.Type) == "poster" && camp.TemplateName != "" {
+			sent += broadcastTemplate(camp)
+		}
 
-		if err := db.MarkCampaignSent(camp.ID, len(phones)); err != nil {
+		if err := db.MarkCampaignSent(camp.ID, sent); err != nil {
 			log.Printf("[Scheduler] Campaign #%d was sent but could not be marked sent: %v", camp.ID, err)
 		}
 	}
@@ -242,7 +247,9 @@ func validateCampaignButtons(buttons []db.CampaignButton) string {
 	return ""
 }
 
-func broadcastPoster(camp db.Campaign, phones []string) {
+// broadcastPoster sends the free message to contacts inside the window and
+// returns how many Meta accepted.
+func broadcastPoster(camp db.Campaign, phones []string) int {
 	image := publicImageURL(camp.ImageURL)
 
 	caption := strings.TrimSpace(camp.Caption)
@@ -258,7 +265,43 @@ func broadcastPoster(camp db.Campaign, phones []string) {
 		}
 	}
 
+	sent := 0
 	for _, phone := range phones {
-		sendImageWithButtons(phone, image, caption, buttons)
+		if sendImageWithButtons(phone, image, caption, buttons) {
+			sent++
+		}
 	}
+	return sent
+}
+
+// broadcastTemplate sends the offer's marketing template to subscribed
+// contacts outside the 24-hour window, the ones the free message cannot
+// reach, and returns how many Meta accepted. Each one is billed by Meta.
+func broadcastTemplate(camp db.Campaign) int {
+	t, err := findTemplate(camp.TemplateName, camp.TemplateLang)
+	if err == nil {
+		if problem := templateProblem(t); problem != "" {
+			err = fmt.Errorf("template %q cannot be sent: %s", t.Name, problem)
+		}
+	}
+	if err != nil {
+		log.Printf("❌ [Scheduler] Campaign #%d: no template messages sent: %v", camp.ID, err)
+		return 0
+	}
+
+	phones, err := db.GetPhonesOutsideServiceWindow()
+	if err != nil {
+		log.Printf("❌ [Scheduler] Campaign #%d: could not list contacts for the template: %v", camp.ID, err)
+		return 0
+	}
+	log.Printf("[Scheduler] Campaign #%d: sending template %q to %d contacts outside the 24h window", camp.ID, t.Name, len(phones))
+
+	image := publicImageURL(camp.ImageURL)
+	sent := 0
+	for _, phone := range phones {
+		if sendTemplate(phone, t, image, camp.Buttons) {
+			sent++
+		}
+	}
+	return sent
 }

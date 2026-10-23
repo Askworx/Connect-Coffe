@@ -70,6 +70,12 @@ CREATE TABLE IF NOT EXISTS campaigns (
 -- poster predates custom buttons and goes out with the original pair.
 ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS buttons JSONB;
 
+-- An approved WhatsApp marketing template to send to subscribed contacts
+-- outside the free 24-hour window. NULL means the offer goes only to those
+-- inside it. Meta charges for each template message delivered.
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS template_name VARCHAR;
+ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS template_lang VARCHAR;
+
 CREATE TABLE IF NOT EXISTS quizzes (
     id SERIAL PRIMARY KEY,
     campaign_id INT REFERENCES campaigns(id),

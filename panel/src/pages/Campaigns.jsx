@@ -17,6 +17,7 @@ import {
   deleteCampaign,
   uploadImage,
   getContacts,
+  getWhatsAppTemplates,
 } from '../api';
 import { getBroadcastStatus } from '../lib/broadcastStatus';
 import { isInWindow } from '../lib/replyWindow';
@@ -147,6 +148,17 @@ const WHEN_TABS = [
   { value: 'later', label: 'Schedule' },
 ];
 
+const AUDIENCE_TABS = [
+  { value: 'free', label: 'Last 24 hours' },
+  { value: 'everyone', label: 'Everyone' },
+];
+
+/** A WhatsApp template's key in the picker: name and language together. */
+const waKey = (t) => `${t.name}|${t.language}`;
+
+/** The text of one part of a WhatsApp template, such as its BODY. */
+const waText = (t, type) => t?.components?.find((c) => c.type === type)?.text || '';
+
 const SOURCE_TABS = [
   { value: 'url', label: 'Link' },
   { value: 'local', label: 'Upload' },
@@ -214,6 +226,12 @@ export default function Campaigns() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadSource, setUploadSource] = useState('url');
   const [localPreview, setLocalPreview] = useState('');
+
+  // Who outside the free window gets it: 'free' sends only inside it,
+  // 'everyone' also sends an approved WhatsApp template, which Meta bills.
+  const [reach, setReach] = useState('free');
+  const [waTemplates, setWaTemplates] = useState({ loading: false, list: [], error: '' });
+  const [waTemplateKey, setWaTemplateKey] = useState('');
 
   const [modal, setModal] = useState({ open: false, title: '', message: '', type: 'success' });
   const [confirmCancel, setConfirmCancel] = useState(null);
@@ -287,10 +305,29 @@ export default function Campaigns() {
     setUploadSource('url');
     setLocalPreview('');
     setErrors({});
+    setReach('free');
+    setWaTemplateKey('');
     if (template) applyTemplate(template);
     setComposerOpen(true);
     loadAudience();
   };
+
+  const loadWaTemplates = useCallback(() => {
+    setWaTemplates((s) => ({ ...s, loading: true, error: '' }));
+    getWhatsAppTemplates()
+      .then(({ data }) => setWaTemplates({ loading: false, list: data?.data || [], error: data?.error || '' }))
+      .catch((err) => {
+        console.error(err);
+        setWaTemplates({ loading: false, list: [], error: 'Could not read your WhatsApp templates. Try again.' });
+      });
+  }, []);
+
+  const chooseReach = (value) => {
+    setReach(value);
+    if (value === 'everyone' && waTemplates.list.length === 0 && !waTemplates.loading) loadWaTemplates();
+  };
+
+  const waTemplate = waTemplates.list.find((t) => waKey(t) === waTemplateKey);
 
   const applyTemplate = (template) => {
     setTemplateId(template.id);
@@ -337,6 +374,7 @@ export default function Campaigns() {
     if (when === 'later' && !form.scheduled_at) next.scheduled_at = 'Choose when it should go out.';
     const problem = buttonProblem(form.buttons);
     if (problem) next.buttons = problem;
+    if (reach === 'everyone' && !waTemplate) next.waTemplate = 'Choose the approved template to send to everyone else.';
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -363,6 +401,8 @@ export default function Campaigns() {
         caption: form.caption,
         scheduled_at: at.toISOString(),
         buttons: form.buttons.map((b) => ({ id: b.id, title: b.title.trim() })),
+        template_name: reach === 'everyone' ? waTemplate.name : '',
+        template_lang: reach === 'everyone' ? waTemplate.language : '',
       });
 
       setComposerOpen(false);
@@ -370,9 +410,13 @@ export default function Campaigns() {
         open: true,
         title: when === 'now' ? 'Offer on its way' : 'Offer scheduled',
         message:
-          when === 'now'
-            ? 'It is going out now to everyone who messaged in the last 24 hours.'
-            : 'It will go out at the time you set. You can cancel it from this page until then.',
+          (when === 'now'
+            ? 'It is going out now to everyone who messaged in the last 24 hours'
+            : 'It will go out at the time you set to everyone who messaged in the 24 hours before') +
+          (reach === 'everyone'
+            ? `, and as the “${waTemplate.name}” template to every other subscribed contact.`
+            : '.') +
+          (when === 'now' ? '' : ' You can cancel it from this page until then.'),
         type: 'success',
       });
       load();
@@ -410,13 +454,17 @@ export default function Campaigns() {
 
   const reachLine = useMemo(() => {
     if (audience === null) return 'The number of recipients could not be read just now.';
+    if (reach === 'everyone') {
+      const paid = audience.subscribed - audience.reachable;
+      return `Goes to all ${audience.subscribed} subscribed contacts: ${audience.reachable} free, and ${paid} as a paid template message, counted as of now.`;
+    }
     if (audience.reachable === 0) {
       return 'Right now nobody has messaged in the last 24 hours, so this would reach nobody.';
     }
     return `Goes free to ${audience.reachable} of ${audience.subscribed} subscribed ${
       audience.subscribed === 1 ? 'contact' : 'contacts'
     } — the ones who messaged in the last 24 hours.`;
-  }, [audience]);
+  }, [audience, reach]);
 
   const previewCaption = form.caption.trim();
   const previewImage = uploadSource === 'local' ? localPreview : form.image_url.trim();
@@ -538,6 +586,11 @@ export default function Campaigns() {
                           {campaign.buttons?.length > 0 && (
                             <p className="mt-1 text-[12px] leading-snug text-text-secondary">
                               Buttons: {campaign.buttons.map((b) => b.title).join(' · ')}
+                            </p>
+                          )}
+                          {campaign.template_name && (
+                            <p className="mt-0.5 text-[12px] leading-snug text-text-secondary">
+                              Everyone else: template “{campaign.template_name}”
                             </p>
                           )}
                         </div>
@@ -762,6 +815,64 @@ export default function Campaigns() {
                     <p role="alert" className="text-[12px] text-danger">{errors.buttons}</p>
                   )}
                 </fieldset>
+
+                <div className="space-y-2">
+                  <Label>Who gets it</Label>
+                  <Tabs value={reach} onValueChange={chooseReach} items={AUDIENCE_TABS} layoutId="offer-reach" />
+                  {reach === 'free' ? (
+                    <p className="text-[12px] leading-relaxed text-text-secondary">
+                      Free, but only reaches people who messaged in the 24 hours before it goes out.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[12px] leading-relaxed text-text-secondary">
+                        People in the last 24 hours get this offer free. Every other subscribed contact gets an
+                        approved WhatsApp marketing template with this photo, and Meta charges for each one.
+                      </p>
+                      {waTemplates.loading ? (
+                        <p className="text-[12px] text-text-secondary">Loading your templates…</p>
+                      ) : waTemplates.error ? (
+                        <p role="alert" className="text-[12px] text-danger">
+                          {waTemplates.error}{' '}
+                          <button type="button" onClick={loadWaTemplates} className="underline underline-offset-2">
+                            Try again
+                          </button>
+                        </p>
+                      ) : (
+                        <>
+                          <Select
+                            aria-label="WhatsApp template"
+                            value={waTemplateKey}
+                            onChange={(e) => setWaTemplateKey(e.target.value)}
+                            aria-invalid={!!errors.waTemplate}
+                          >
+                            <option value="">
+                              {waTemplates.list.length ? 'Choose a template' : 'No marketing templates yet'}
+                            </option>
+                            {waTemplates.list.map((t) => (
+                              <option key={waKey(t)} value={waKey(t)} disabled={!!t.problem}>
+                                {t.name} ({t.language}){t.problem ? ` — ${t.problem}` : ''}
+                              </option>
+                            ))}
+                          </Select>
+                          {waTemplate && (
+                            <p className="whitespace-pre-line rounded-lg border border-border bg-paper px-3 py-2 text-[12px] leading-relaxed text-body-text">
+                              {waText(waTemplate, 'BODY')}
+                            </p>
+                          )}
+                          {waTemplate && form.buttons.length > 0 && (
+                            <p className="text-[12px] leading-relaxed text-text-secondary">
+                              The template's quick-reply buttons take this offer's button actions in order.
+                            </p>
+                          )}
+                        </>
+                      )}
+                      {errors.waTemplate && (
+                        <p role="alert" className="text-[12px] text-danger">{errors.waTemplate}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-2">
                   <Label>When</Label>

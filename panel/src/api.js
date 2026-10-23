@@ -98,6 +98,9 @@ export const getCampaigns = (params) => api.get('/campaigns', { params });
 export const createCampaign = (data) => api.post('/campaigns', data);
 export const deleteCampaign = (id) => api.delete(`/campaigns/${id}`);
 export const getCampaignAnalytics = (id) => api.get(`/campaigns/${id}/analytics`);
+// Approved marketing templates on the WhatsApp account, for reaching
+// contacts outside the free 24-hour window.
+export const getWhatsAppTemplates = () => api.get('/whatsapp-templates');
 
 // Offers — what a customer sees on tapping Offers in the bot
 export const getOffers = () => api.get('/offers');

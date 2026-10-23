@@ -84,12 +84,12 @@ func sendInteractiveButtons(to, bodyText string, buttons []Button) {
 	sendToMeta(payload, to, bodyText)
 }
 
-func sendImageWithButtons(to, imageURL, bodyText string, buttons []Button) {
+func sendImageWithButtons(to, imageURL, bodyText string, buttons []Button) bool {
 	header := map[string]interface{}{
 		"type":  "image",
 		"image": map[string]string{"link": imageURL},
 	}
-	sendButtonsWithHeader(to, header, bodyText, buttons, "[Image: "+imageURL+"] "+bodyText)
+	return sendButtonsWithHeader(to, header, bodyText, buttons, "[Image: "+imageURL+"] "+bodyText)
 }
 
 // sendDocumentWithButtons puts a file, such as the menu PDF, on top of a
@@ -103,7 +103,7 @@ func sendDocumentWithButtons(to, docURL, filename, bodyText string, buttons []Bu
 	sendButtonsWithHeader(to, header, bodyText, buttons, "[Document: "+docURL+"] "+bodyText)
 }
 
-func sendButtonsWithHeader(to string, header map[string]interface{}, bodyText string, buttons []Button, logMsg string) {
+func sendButtonsWithHeader(to string, header map[string]interface{}, bodyText string, buttons []Button, logMsg string) bool {
 	var waButtons []map[string]interface{}
 	for _, b := range buttons {
 		title := b.Title
@@ -136,7 +136,7 @@ func sendButtonsWithHeader(to string, header map[string]interface{}, bodyText st
 			},
 		},
 	}
-	sendToMeta(payload, to, logMsg)
+	return sendToMeta(payload, to, logMsg)
 }
 
 // sendLocation sends a map pin the customer can tap to navigate.
@@ -156,7 +156,8 @@ func sendLocation(to string, lat, lng float64, name, address string) {
 	sendToMeta(payload, to, fmt.Sprintf("[Location: %s]", name))
 }
 
-func sendToMeta(payload map[string]interface{}, to, logMsg string) {
+// sendToMeta reports whether Meta accepted the message.
+func sendToMeta(payload map[string]interface{}, to, logMsg string) bool {
 	url := fmt.Sprintf("https://graph.facebook.com/v17.0/%s/messages", os.Getenv("PHONE_NUMBER_ID"))
 	token := os.Getenv("ACCESS_TOKEN")
 
@@ -167,7 +168,7 @@ func sendToMeta(payload map[string]interface{}, to, logMsg string) {
 		jsonPayload, _ := json.Marshal(payload)
 		log.Printf("🧪 [dry-run] to %s: %s\n", to, string(jsonPayload))
 		db.LogMessage(to, "outgoing", logMsg)
-		return
+		return true
 	}
 
 	// Normalize phone number for Meta (must include country code, no +, no spaces)
@@ -189,7 +190,7 @@ func sendToMeta(payload map[string]interface{}, to, logMsg string) {
 	resp, err := metaClient.Do(req)
 	if err != nil {
 		log.Println("Error sending to Meta:", err)
-		return
+		return false
 	}
 	defer resp.Body.Close()
 
@@ -197,11 +198,12 @@ func sendToMeta(payload map[string]interface{}, to, logMsg string) {
 		bodyBytes, _ := io.ReadAll(resp.Body)
 		log.Printf("❌ Meta API Error (Status %d): %s\n", resp.StatusCode, string(bodyBytes))
 		log.Printf("❌ Failed Payload: %s\n", string(jsonPayload))
-		return
+		return false
 	}
 
 	db.LogMessage(to, "outgoing", logMsg)
 	log.Printf("✅ Meta Success! Message sent to %s: %s\n", to, logMsg)
+	return true
 }
 
 func createCleanID(text string) string {

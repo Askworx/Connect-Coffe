@@ -33,6 +33,10 @@ type Campaign struct {
 	CreatedAt     time.Time `json:"created_at"`
 	// Empty for quizzes, and for posters saved before buttons were editable.
 	Buttons []CampaignButton `json:"buttons"`
+	// An approved marketing template for contacts outside the 24-hour
+	// window. Empty means the offer reaches only those inside it.
+	TemplateName string `json:"template_name"`
+	TemplateLang string `json:"template_lang"`
 }
 
 type QuizResponseDetail struct {
@@ -83,14 +87,16 @@ func CreateCampaign(c Campaign) (int, error) {
 	}
 
 	query := `INSERT INTO campaigns
-		(type, question, option_a, option_b, option_c, correct_answer, explanation, youtube_link, image_url, caption, scheduled_at, buttons)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb)
+		(type, question, option_a, option_b, option_c, correct_answer, explanation, youtube_link, image_url, caption, scheduled_at, buttons,
+		 template_name, template_lang)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb,NULLIF($13, ''),NULLIF($14, ''))
 		RETURNING id`
 	var id int
 	err := Pool.QueryRow(context.Background(), query,
 		c.Type, c.Question, c.OptionA, c.OptionB, c.OptionC,
 		c.CorrectAnswer, c.Explanation, c.YouTubeLink,
 		c.ImageURL, c.Caption, c.ScheduledAt, buttons,
+		c.TemplateName, c.TemplateLang,
 	).Scan(&id)
 	return id, err
 }
@@ -100,7 +106,7 @@ func GetAllCampaigns() ([]Campaign, error) {
 	rows, err := Pool.Query(context.Background(),
 		`SELECT id, type, question, option_a, option_b, option_c, correct_answer, explanation,
 		        youtube_link, image_url, caption, scheduled_at, status, total_sent, created_at,
-		        COALESCE(buttons, '[]'::jsonb)
+		        COALESCE(buttons, '[]'::jsonb), COALESCE(template_name, ''), COALESCE(template_lang, '')
 		 FROM campaigns ORDER BY scheduled_at DESC`)
 	if err != nil {
 		return nil, err
@@ -113,7 +119,8 @@ func GetAllCampaigns() ([]Campaign, error) {
 		var rawButtons []byte
 		err := rows.Scan(&c.ID, &c.Type, &c.Question, &c.OptionA, &c.OptionB, &c.OptionC,
 			&c.CorrectAnswer, &c.Explanation, &c.YouTubeLink, &c.ImageURL, &c.Caption,
-			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons)
+			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons,
+			&c.TemplateName, &c.TemplateLang)
 		if err != nil {
 			// Silently dropping the row hid a whole page of campaigns behind a
 			// 200 with an empty list. Skipping is still the right recovery, but
@@ -132,7 +139,7 @@ func GetDueCampaigns() ([]Campaign, error) {
 	rows, err := Pool.Query(context.Background(),
 		`SELECT id, type, question, option_a, option_b, option_c, correct_answer, explanation,
 		        youtube_link, image_url, caption, scheduled_at, status, total_sent, created_at,
-		        COALESCE(buttons, '[]'::jsonb)
+		        COALESCE(buttons, '[]'::jsonb), COALESCE(template_name, ''), COALESCE(template_lang, '')
 		 FROM campaigns WHERE status = 'scheduled' AND scheduled_at <= NOW()`)
 	if err != nil {
 		return nil, err
@@ -145,7 +152,8 @@ func GetDueCampaigns() ([]Campaign, error) {
 		var rawButtons []byte
 		rows.Scan(&c.ID, &c.Type, &c.Question, &c.OptionA, &c.OptionB, &c.OptionC,
 			&c.CorrectAnswer, &c.Explanation, &c.YouTubeLink, &c.ImageURL, &c.Caption,
-			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons)
+			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons,
+			&c.TemplateName, &c.TemplateLang)
 		c.Buttons = decodeButtons(c.ID, rawButtons)
 		campaigns = append(campaigns, c)
 	}
@@ -242,7 +250,7 @@ func GetCampaignAnalytics(campaignID int) (CampaignAnalytics, error) {
 func GetCampaignsPaginated(limit, offset int, start, end string) ([]Campaign, error) {
 	query := `SELECT id, type, question, option_a, option_b, option_c, correct_answer, explanation,
 		        youtube_link, image_url, caption, scheduled_at, status, total_sent, created_at,
-		        COALESCE(buttons, '[]'::jsonb)
+		        COALESCE(buttons, '[]'::jsonb), COALESCE(template_name, ''), COALESCE(template_lang, '')
 		 FROM campaigns WHERE 1=1`
 	args := []interface{}{}
 	argID := 1
@@ -273,7 +281,8 @@ func GetCampaignsPaginated(limit, offset int, start, end string) ([]Campaign, er
 		var rawButtons []byte
 		err := rows.Scan(&c.ID, &c.Type, &c.Question, &c.OptionA, &c.OptionB, &c.OptionC,
 			&c.CorrectAnswer, &c.Explanation, &c.YouTubeLink, &c.ImageURL, &c.Caption,
-			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons)
+			&c.ScheduledAt, &c.Status, &c.TotalSent, &c.CreatedAt, &rawButtons,
+			&c.TemplateName, &c.TemplateLang)
 		if err != nil {
 			// Silently dropping the row hid a whole page of campaigns behind a
 			// 200 with an empty list. Skipping is still the right recovery, but

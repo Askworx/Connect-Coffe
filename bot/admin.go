@@ -409,6 +409,23 @@ func AdminRoutes() chi.Router {
 			http.Error(w, "scheduled_at is required", http.StatusBadRequest)
 			return
 		}
+		c.TemplateName, c.TemplateLang = strings.TrimSpace(c.TemplateName), strings.TrimSpace(c.TemplateLang)
+		if c.Type != "poster" {
+			c.TemplateName, c.TemplateLang = "", ""
+		}
+		// Check the template now: found missing at send time, the paid
+		// half of the offer would quietly go to nobody.
+		if c.TemplateName != "" {
+			t, err := findTemplate(c.TemplateName, c.TemplateLang)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			if problem := templateProblem(t); problem != "" {
+				http.Error(w, fmt.Sprintf("template %q cannot be used: %s", t.Name, problem), http.StatusBadRequest)
+				return
+			}
+		}
 
 		id, err := db.CreateCampaign(c)
 		if err != nil {
@@ -423,6 +440,8 @@ func AdminRoutes() chi.Router {
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]int{"id": id})
 	})
+
+	r.Get("/whatsapp-templates", templatesHandler)
 
 	r.Delete("/campaigns/{id}", func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
