@@ -236,6 +236,30 @@ func AdminRoutes() chi.Router {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	r.Post("/contacts/subscribe-all", func(w http.ResponseWriter, r *http.Request) {
+		updated, err := db.UpdateAllContactsOptOut(false)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct {
+			Updated int64 `json:"updated"`
+		}{Updated: updated})
+	})
+
+	r.Post("/contacts/unsubscribe-all", func(w http.ResponseWriter, r *http.Request) {
+		updated, err := db.UpdateAllContactsOptOut(true)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(struct {
+			Updated int64 `json:"updated"`
+		}{Updated: updated})
+	})
+
 	r.Post("/contacts/{id}/opt-out", func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 		var id int

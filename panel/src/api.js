@@ -81,6 +81,8 @@ export const saveContact = (data) => api.post('/contacts', data);
 export const deleteContact = (id) => api.delete(`/contacts/${id}`);
 export const importContacts = (contacts) => api.post('/contacts/import', { contacts });
 export const toggleOptOut = (id, optOut) => api.post(`/contacts/${id}/opt-out`, { opt_out: optOut });
+export const subscribeAllContacts = () => api.post('/contacts/subscribe-all');
+export const unsubscribeAllContacts = () => api.post('/contacts/unsubscribe-all');
 export const getMessages = (params) => api.get('/messages', { params });
 
 /** Per-day and per-hour counts for the dashboard, aggregated server-side. */
