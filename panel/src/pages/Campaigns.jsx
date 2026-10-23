@@ -183,6 +183,14 @@ const buttonProblem = (buttons) => {
 /** An offer whose time has come: the bot is sending it now. */
 const isDue = (c) => c.scheduled_at && new Date(c.scheduled_at) <= new Date();
 
+/** A past offer in the shape of a template, so it can be opened and sent again. */
+const asDraft = (campaign) => ({
+  id: '',
+  image: campaign.image_url || '',
+  caption: campaign.caption || '',
+  buttons: (campaign.buttons || []).map(({ id, title }) => ({ id, title })),
+});
+
 /** The first line of the caption, without WhatsApp's formatting marks. */
 const headline = (campaign) =>
   (campaign.caption || '').split('\n').find((l) => l.trim())?.replace(/[*_~`]/g, '').trim() ||
@@ -513,7 +521,12 @@ export default function Campaigns() {
                 return (
                   <TableRow key={campaign.id}>
                     <TableCell>
-                      <div className="flex items-start gap-3">
+                      <button
+                        type="button"
+                        onClick={() => openComposer(asDraft(campaign))}
+                        aria-label={`Open “${headline(campaign)}” to send again`}
+                        className="group flex w-full items-start gap-3 text-left"
+                      >
                         {campaign.image_url ? (
                           <img
                             src={campaign.image_url}
@@ -526,14 +539,14 @@ export default function Campaigns() {
                           </span>
                         )}
                         <div className="min-w-0">
-                          <p className="font-medium text-ink">{headline(campaign)}</p>
+                          <p className="font-medium text-ink group-hover:text-primary">{headline(campaign)}</p>
                           {campaign.buttons?.length > 0 && (
                             <p className="mt-1 text-[12px] leading-snug text-text-secondary">
                               Buttons: {campaign.buttons.map((b) => b.title).join(' · ')}
                             </p>
                           )}
                         </div>
-                      </div>
+                      </button>
                     </TableCell>
 
                     <TableCell className="text-center">
