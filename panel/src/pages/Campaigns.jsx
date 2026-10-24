@@ -19,7 +19,7 @@ import {
   getContacts,
   getWhatsAppTemplates,
 } from '../api';
-import { BUTTON_ACTIONS, actionLabel } from '../lib/buttonActions';
+import { BUTTON_ACTIONS, actionLabel, guessAction } from '../lib/buttonActions';
 import { getBroadcastStatus } from '../lib/broadcastStatus';
 import { isInWindow } from '../lib/replyWindow';
 
@@ -229,6 +229,7 @@ export default function Campaigns() {
   const [reach, setReach] = useState('free');
   const [waTemplates, setWaTemplates] = useState({ loading: false, list: [], error: '' });
   const [waTemplateKey, setWaTemplateKey] = useState('');
+  const [filledFrom, setFilledFrom] = useState('');
 
   const [modal, setModal] = useState({ open: false, title: '', message: '', type: 'success' });
   const [confirmCancel, setConfirmCancel] = useState(null);
@@ -304,6 +305,7 @@ export default function Campaigns() {
     setErrors({});
     setReach('free');
     setWaTemplateKey('');
+    setFilledFrom('');
     if (template) applyTemplate(template);
     setComposerOpen(true);
     loadAudience();
@@ -338,6 +340,23 @@ export default function Campaigns() {
       localFile: undefined,
     }));
     setErrors({});
+  };
+
+  // Choosing a WhatsApp template fills the offer's message and buttons from
+  // it, so people inside the free window get the same text and buttons as
+  // everyone who gets the template, and each button does the same thing.
+  const chooseWaTemplate = (key) => {
+    setWaTemplateKey(key);
+    const t = waTemplates.list.find((x) => waKey(x) === key);
+    if (!t) return;
+    setForm((f) => ({
+      ...f,
+      caption: waText(t, 'BODY') || f.caption,
+      buttons: waButtons(t)
+        .slice(0, MAX_BUTTONS)
+        .map((b, i) => ({ id: t.actions?.[i] || guessAction(b.text), title: b.text })),
+    }));
+    setFilledFrom(t.name);
   };
 
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -840,7 +859,7 @@ export default function Campaigns() {
                           <Select
                             aria-label="WhatsApp template"
                             value={waTemplateKey}
-                            onChange={(e) => setWaTemplateKey(e.target.value)}
+                            onChange={(e) => chooseWaTemplate(e.target.value)}
                             aria-invalid={!!errors.waTemplate}
                           >
                             <option value="">
@@ -855,6 +874,11 @@ export default function Campaigns() {
                           {waTemplate && (
                             <p className="whitespace-pre-line rounded-lg border border-border bg-paper px-3 py-2 text-[12px] leading-relaxed text-body-text">
                               {waText(waTemplate, 'BODY')}
+                            </p>
+                          )}
+                          {waTemplate && filledFrom === waTemplate.name && (
+                            <p className="text-[12px] font-medium text-success">
+                              Message and buttons filled in from this template.
                             </p>
                           )}
                           {waTemplate && waButtons(waTemplate).length > 0 && (
