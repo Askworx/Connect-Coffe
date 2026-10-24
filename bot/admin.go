@@ -444,6 +444,7 @@ func AdminRoutes() chi.Router {
 	r.Get("/whatsapp-templates", templatesHandler)
 	r.Post("/whatsapp-templates", createTemplateHandler)
 	r.Delete("/whatsapp-templates/{name}", deleteTemplateHandler)
+	r.Put("/whatsapp-templates/{name}/actions", templateActionsHandler)
 
 	r.Delete("/campaigns/{id}", func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")

@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"connect-coffee-bot/db"
+
+	"github.com/go-chi/chi/v5"
 )
 
 // WhatsApp only delivers a free-form message to someone who wrote in the last
@@ -154,11 +156,66 @@ func findTemplate(name, lang string) (MetaTemplate, error) {
 	return MetaTemplate{}, fmt.Errorf("there is no template %q (%s) on your WhatsApp account", name, lang)
 }
 
+// What each of a template's quick-reply buttons does is set in the panel and
+// kept here, not at Meta: Meta fixes only the button text, and a tap comes
+// back as whatever payload the send gave it. So it can change at any time,
+// even after approval.
+
+func templateActionsKey(name string) string { return "template_actions:" + name }
+
+// templateActions returns the action ids saved for a template's quick-reply
+// buttons, in button order, or nil if none were saved.
+func templateActions(name string) []string {
+	var actions []string
+	if raw := db.GetSetting(templateActionsKey(name)); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &actions); err != nil {
+			log.Printf("[Templates] Saved actions for %q are unreadable: %v", name, err)
+			return nil
+		}
+	}
+	return actions
+}
+
+func saveTemplateActions(name string, actions []string) error {
+	raw, _ := json.Marshal(actions)
+	if len(actions) == 0 {
+		raw = nil
+	}
+	return db.UpdateSetting(templateActionsKey(name), string(raw))
+}
+
+// quickReplyCount is how many quick-reply buttons t has.
+func (t MetaTemplate) quickReplyCount() int {
+	n := 0
+	if b, ok := t.component("BUTTONS"); ok {
+		for _, btn := range b.Buttons {
+			if btn.Type == "QUICK_REPLY" {
+				n++
+			}
+		}
+	}
+	return n
+}
+
+// checkTemplateActions returns why actions cannot go on a template with
+// quick quick-reply buttons, or "" if they can.
+func checkTemplateActions(actions []string, quick int) string {
+	if len(actions) != quick {
+		return "choose what each button does"
+	}
+	for _, a := range actions {
+		if !posterButtonActions[a] {
+			return fmt.Sprintf("%q is not an action the bot handles", a)
+		}
+	}
+	return ""
+}
+
 // sendTemplate sends t to one contact and reports whether Meta accepted it.
-// An image header carries the offer's photo. Quick-reply buttons are given
-// the offer's button actions in order, so a tap does what the same button
-// does on the free message.
-func sendTemplate(to string, t MetaTemplate, imageURL string, actions []db.CampaignButton) bool {
+// An image header carries the offer's photo. Quick-reply buttons carry the
+// given actions in order as their payloads, so a tap does what that action
+// does anywhere else in the bot.
+func sendTemplate(to string, t MetaTemplate, imageURL string, actions []string) bool {
 	payload := map[string]interface{}{
 		"messaging_product": "whatsapp",
 		"recipient_type":    "individual",
@@ -175,7 +232,7 @@ func sendTemplate(to string, t MetaTemplate, imageURL string, actions []db.Campa
 
 // templateMessage is the "template" object of a send: the template's name and
 // language, and the values its image header and quick-reply buttons take.
-func templateMessage(t MetaTemplate, imageURL string, actions []db.CampaignButton) map[string]interface{} {
+func templateMessage(t MetaTemplate, imageURL string, actions []string) map[string]interface{} {
 	var components []map[string]interface{}
 	if h, ok := t.component("HEADER"); ok && h.Format == "IMAGE" {
 		components = append(components, map[string]interface{}{
@@ -197,7 +254,7 @@ func templateMessage(t MetaTemplate, imageURL string, actions []db.CampaignButto
 					"sub_type": "quick_reply",
 					"index":    fmt.Sprint(i),
 					"parameters": []map[string]string{
-						{"type": "payload", "payload": actions[quick].ID},
+						{"type": "payload", "payload": actions[quick]},
 					},
 				})
 			}
@@ -220,7 +277,8 @@ func templateMessage(t MetaTemplate, imageURL string, actions []db.CampaignButto
 func templatesHandler(w http.ResponseWriter, r *http.Request) {
 	type item struct {
 		MetaTemplate
-		Problem string `json:"problem"`
+		Problem string   `json:"problem"`
+		Actions []string `json:"actions"`
 	}
 	w.Header().Set("Content-Type", "application/json")
 
@@ -232,7 +290,40 @@ func templatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]item, 0, len(list))
 	for _, t := range list {
-		out = append(out, item{MetaTemplate: t, Problem: templateProblem(t)})
+		out = append(out, item{MetaTemplate: t, Problem: templateProblem(t), Actions: templateActions(t.Name)})
 	}
 	json.NewEncoder(w).Encode(map[string]interface{}{"data": out})
+}
+
+// templateActionsHandler sets what a template's quick-reply buttons do.
+func templateActionsHandler(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+	var body struct {
+		Actions []string `json:"actions"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 4<<10)).Decode(&body); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Those button actions could not be read.")
+		return
+	}
+	list, err := fetchTemplates()
+	if err != nil {
+		writeJSONError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	for _, t := range list {
+		if t.Name != name {
+			continue
+		}
+		if problem := checkTemplateActions(body.Actions, t.quickReplyCount()); problem != "" {
+			writeJSONError(w, http.StatusBadRequest, "Not saved: "+problem+".")
+			return
+		}
+		if err := saveTemplateActions(name, body.Actions); err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "The button actions could not be saved.")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSONError(w, http.StatusNotFound, "There is no template with that name.")
 }

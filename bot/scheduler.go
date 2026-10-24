@@ -296,10 +296,19 @@ func broadcastTemplate(camp db.Campaign) int {
 	}
 	log.Printf("[Scheduler] Campaign #%d: sending template %q to %d contacts outside the 24h window", camp.ID, t.Name, len(phones))
 
+	// The actions saved for the template win; a template made before they
+	// could be set takes the offer's button actions in order.
+	actions := templateActions(t.Name)
+	if len(actions) == 0 {
+		for _, b := range camp.Buttons {
+			actions = append(actions, b.ID)
+		}
+	}
+
 	image := publicImageURL(camp.ImageURL)
 	sent := 0
 	for _, phone := range phones {
-		if sendTemplate(phone, t, image, camp.Buttons) {
+		if sendTemplate(phone, t, image, actions) {
 			sent++
 		}
 	}

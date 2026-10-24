@@ -104,6 +104,9 @@ export const getWhatsAppTemplates = () => api.get('/whatsapp-templates');
 // Sends a new marketing template to Meta for review.
 export const createWhatsAppTemplate = (data) => api.post('/whatsapp-templates', data);
 export const deleteWhatsAppTemplate = (name) => api.delete(`/whatsapp-templates/${encodeURIComponent(name)}`);
+// What each of a template's quick-reply buttons does, in button order.
+export const setWhatsAppTemplateActions = (name, actions) =>
+  api.put(`/whatsapp-templates/${encodeURIComponent(name)}/actions`, { actions });
 
 // Offers — what a customer sees on tapping Offers in the bot
 export const getOffers = () => api.get('/offers');

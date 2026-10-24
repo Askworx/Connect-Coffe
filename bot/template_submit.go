@@ -39,6 +39,7 @@ type templateDraft struct {
 	Body     string   `json:"body"`
 	ImageURL string   `json:"image_url"`
 	Buttons  []string `json:"buttons"`
+	Actions  []string `json:"actions"`
 }
 
 // check tidies the draft and returns why Meta would refuse it, or "".
@@ -78,7 +79,7 @@ func (d *templateDraft) check() string {
 		}
 		seen[b] = true
 	}
-	return ""
+	return checkTemplateActions(d.Actions, len(d.Buttons))
 }
 
 // metaError pulls the explanation out of a Graph API error. Meta's message
@@ -263,6 +264,9 @@ func createTemplateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	forgetTemplates()
 	log.Printf("[Templates] Sent %q to Meta for review (id %s, %s)", d.Name, created.ID, created.Status)
+	if err := saveTemplateActions(d.Name, d.Actions); err != nil {
+		log.Printf("❌ [Templates] %q was sent but its button actions were not saved: %v", d.Name, err)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(created)
@@ -286,6 +290,7 @@ func deleteTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	forgetTemplates()
+	saveTemplateActions(name, nil)
 	log.Printf("[Templates] Deleted %q", name)
 	w.WriteHeader(http.StatusNoContent)
 }

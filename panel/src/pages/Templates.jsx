@@ -1,7 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Copy, FileCheck2, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 
-import { getWhatsAppTemplates, createWhatsAppTemplate, deleteWhatsAppTemplate, uploadImage } from '../api';
+import {
+  getWhatsAppTemplates,
+  createWhatsAppTemplate,
+  deleteWhatsAppTemplate,
+  setWhatsAppTemplateActions,
+  uploadImage,
+} from '../api';
+import { BUTTON_ACTIONS, actionLabel, guessAction } from '../lib/buttonActions';
 
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
@@ -14,6 +21,7 @@ import { Card } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
+import { Select } from '../components/ui/select';
 import { Dialog, DialogHeader, DialogBody, DialogFooter } from '../components/ui/dialog';
 
 // Mirrors templateDraft.check in the bot's template_submit.go.
@@ -59,6 +67,8 @@ const REJECTION = {
 
 const component = (t, type) => (t.components || []).find((c) => c.type === type);
 
+const quickReplies = (t) => (component(t, 'BUTTONS')?.buttons || []).filter((b) => b.type === 'QUICK_REPLY');
+
 const rejectionText = (t) =>
   t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE'
     ? REJECTION[t.rejected_reason] || t.rejected_reason
@@ -69,7 +79,10 @@ const LANGUAGES = { en: 'English', en_US: 'English (US)', en_GB: 'English (UK)' 
 const emptyForm = () => ({
   title: '',
   body: '',
-  buttons: ['See Menu', 'Address'],
+  buttons: [
+    { title: 'See Menu', action: 'view_menu' },
+    { title: 'Address', action: 'visit' },
+  ],
   localFile: null,
 });
 
@@ -85,6 +98,8 @@ export default function Templates() {
   const [sending, setSending] = useState(false);
 
   const [viewing, setViewing] = useState(null);
+  const [viewActions, setViewActions] = useState([]);
+  const [savingActions, setSavingActions] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [modal, setModal] = useState({ open: false, title: '', message: '', type: 'info' });
 
@@ -117,9 +132,38 @@ export default function Templates() {
 
   useEffect(() => () => localPreview && URL.revokeObjectURL(localPreview), [localPreview]);
 
+  // Opening a template loads what its buttons do; one made before actions
+  // could be set starts blank so the choice is made on purpose.
+  const openTemplate = (t) => {
+    setViewing(t);
+    setViewActions(quickReplies(t).map((_, i) => t.actions?.[i] || ''));
+  };
+  const actionsChanged =
+    !!viewing && viewActions.some((a, i) => a !== (viewing.actions?.[i] || ''));
+
+  const saveViewActions = async () => {
+    setSavingActions(true);
+    try {
+      await setWhatsAppTemplateActions(viewing.name, viewActions);
+      const saved = { ...viewing, actions: viewActions };
+      setViewing(saved);
+      setTemplates((list) => list.map((t) => (t.name === saved.name ? saved : t)));
+    } catch (err) {
+      console.error(err);
+      setModal({
+        open: true,
+        title: 'Not saved',
+        message: err.response?.data?.error || 'The button actions were not saved. Try again.',
+        type: 'error',
+      });
+    } finally {
+      setSavingActions(false);
+    }
+  };
+
   const setField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
-  const setButton = (i, value) =>
-    setForm((f) => ({ ...f, buttons: f.buttons.map((b, j) => (j === i ? value : b)) }));
+  const setButton = (i, key, value) =>
+    setForm((f) => ({ ...f, buttons: f.buttons.map((b, j) => (j === i ? { ...b, [key]: value } : b)) }));
 
   // A sent template cannot be edited, so "edit" means starting a new one from
   // its text; the photo has to be chosen again.
@@ -129,7 +173,9 @@ export default function Templates() {
         ? {
             ...emptyForm(),
             body: component(from, 'BODY')?.text || '',
-            buttons: (component(from, 'BUTTONS')?.buttons || []).map((b) => b.text).slice(0, MAX_BUTTONS),
+            buttons: quickReplies(from)
+              .map((b, i) => ({ title: b.text, action: from.actions?.[i] || guessAction(b.text) }))
+              .slice(0, MAX_BUTTONS),
           }
         : emptyForm(),
     );
@@ -157,7 +203,7 @@ export default function Templates() {
     if (!form.localFile) next.image = 'Choose a photo.';
     else if (!/^image\/(jpeg|png)$/.test(form.localFile.type)) next.image = 'Use a JPG or PNG photo.';
     else if (form.localFile.size > 5 * 1024 * 1024) next.image = 'Use a photo under 5 MB.';
-    const buttons = form.buttons.map((b) => b.trim());
+    const buttons = form.buttons.map((b) => b.title.trim());
     if (buttons.some((b) => !b)) next.buttons = 'Fill in every button, or remove the empty one.';
     else if (buttons.some((b) => charCount(b) > BUTTON_LIMIT)) next.buttons = `Keep each button to ${BUTTON_LIMIT} characters.`;
     else if (new Set(buttons).size !== buttons.length) next.buttons = 'Two buttons cannot have the same text.';
@@ -175,7 +221,8 @@ export default function Templates() {
         name,
         body: form.body.trim(),
         image_url: upload.url,
-        buttons: form.buttons.map((b) => b.trim()),
+        buttons: form.buttons.map((b) => b.title.trim()),
+        actions: form.buttons.map((b) => b.action),
       });
       setEditorOpen(false);
       setModal({
@@ -283,7 +330,7 @@ export default function Templates() {
           {templates.map((t) => {
             const status = templateStatus(t);
             const body = component(t, 'BODY')?.text || '';
-            const buttons = (component(t, 'BUTTONS')?.buttons || []).map((b) => b.text);
+            const buttons = quickReplies(t).map((b) => b.text);
             const reason = rejectionText(t);
             return (
               <Card
@@ -291,11 +338,11 @@ export default function Templates() {
                 role="button"
                 tabIndex={0}
                 aria-label={`Open ${t.name}`}
-                onClick={() => setViewing(t)}
+                onClick={() => openTemplate(t)}
                 onKeyDown={(e) => {
                   if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
                     e.preventDefault();
-                    setViewing(t);
+                    openTemplate(t);
                   }
                 }}
                 className="flex cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-lift focus-visible:outline-2 focus-visible:outline-primary"
@@ -317,9 +364,17 @@ export default function Templates() {
                 </p>
                 {buttons.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
-                    {buttons.map((b) => (
-                      <span key={b} className="rounded-md border border-border bg-paper px-2 py-1 text-[12px] text-primary">
+                    {buttons.map((b, i) => (
+                      <span
+                        key={b}
+                        title={t.actions?.[i] ? actionLabel(t.actions[i]) : 'Not set yet: open the template to choose'}
+                        className="rounded-md border border-border bg-paper px-2 py-1 text-[12px] text-primary"
+                      >
                         {b}
+                        <span className="text-text-secondary">
+                          {' → '}
+                          {t.actions?.[i] ? actionLabel(t.actions[i]).replace(/^Show /, '') : 'not set'}
+                        </span>
                       </span>
                     ))}
                   </div>
@@ -398,13 +453,47 @@ export default function Templates() {
                       {component(viewing, 'BODY')?.text}
                     </p>
                   </div>
+                  {quickReplies(viewing).length > 0 && (
+                    <div className="space-y-2">
+                      <p className="eyebrow">What the buttons do</p>
+                      <p className="text-[12px] text-text-secondary">
+                        Saved here, not at Meta, so you can change it any time.
+                      </p>
+                      {quickReplies(viewing).map((b, i) => (
+                        <div key={b.text} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] items-center gap-3">
+                          <span className="truncate rounded-md border border-border bg-paper px-3 py-2 text-[13px] text-primary">
+                            {b.text}
+                          </span>
+                          <Select
+                            aria-label={`What ${b.text} does`}
+                            value={viewActions[i] || ''}
+                            onChange={(e) =>
+                              setViewActions((list) => list.map((a, j) => (j === i ? e.target.value : a)))
+                            }
+                          >
+                            {!viewActions[i] && <option value="">Choose what it does</option>}
+                            {BUTTON_ACTIONS.map((action) => (
+                              <option key={action.value} value={action.value}>
+                                {action.label}
+                              </option>
+                            ))}
+                          </Select>
+                        </div>
+                      ))}
+                      {actionsChanged && (
+                        <Button type="button" onClick={saveViewActions} disabled={savingActions || viewActions.some((a) => !a)}>
+                          {savingActions ? 'Saving…' : 'Save button actions'}
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <p className="eyebrow mb-3">Preview</p>
                   <WhatsAppPreview
                     message={component(viewing, 'BODY')?.text || ''}
                     image={component(viewing, 'HEADER')?.example?.header_handle?.[0] || ''}
-                    buttons={(component(viewing, 'BUTTONS')?.buttons || []).map((b) => ({ title: b.text }))}
+                    buttons={quickReplies(viewing).map((b) => ({ title: b.text }))}
                   />
                 </div>
               </div>
@@ -514,17 +603,28 @@ export default function Templates() {
                 <div className="space-y-2">
                   <Label>Buttons</Label>
                   <p className="text-[12px] text-text-secondary">
-                    Each button does what the offer’s button in the same place does: keep them in the order you
-                    set the offer’s buttons, for example See Menu, then Address.
+                    The text goes to Meta. What each button does is saved here, and you can change it later from the
+                    template.
                   </p>
                   {form.buttons.map((b, i) => (
-                    <div key={i} className="flex items-center gap-2">
+                    <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] items-center gap-2">
                       <Input
-                        aria-label={`Button ${i + 1}`}
-                        value={b}
+                        aria-label={`Button ${i + 1} text`}
+                        value={b.title}
                         maxLength={BUTTON_LIMIT}
-                        onChange={(e) => setButton(i, e.target.value)}
+                        onChange={(e) => setButton(i, 'title', e.target.value)}
                       />
+                      <Select
+                        aria-label={`Button ${i + 1} action`}
+                        value={b.action}
+                        onChange={(e) => setButton(i, 'action', e.target.value)}
+                      >
+                        {BUTTON_ACTIONS.map((action) => (
+                          <option key={action.value} value={action.value}>
+                            {action.label}
+                          </option>
+                        ))}
+                      </Select>
                       <Button
                         type="button"
                         variant="outline"
@@ -540,7 +640,17 @@ export default function Templates() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setField('buttons', [...form.buttons, ''])}
+                      onClick={() =>
+                        setField('buttons', [
+                          ...form.buttons,
+                          {
+                            title: '',
+                            action:
+                              BUTTON_ACTIONS.find((a) => !form.buttons.some((b) => b.action === a.value))?.value ||
+                              BUTTON_ACTIONS[0].value,
+                          },
+                        ])
+                      }
                     >
                       <Plus />
                       Add button
@@ -564,7 +674,7 @@ export default function Templates() {
                 <WhatsAppPreview
                   message={form.body}
                   image={localPreview}
-                  buttons={form.buttons.map((title) => ({ title }))}
+                  buttons={form.buttons.map((b) => ({ title: b.title }))}
                   empty="Write the message to see it here."
                 />
               </div>

@@ -19,6 +19,7 @@ import {
   getContacts,
   getWhatsAppTemplates,
 } from '../api';
+import { BUTTON_ACTIONS, actionLabel } from '../lib/buttonActions';
 import { getBroadcastStatus } from '../lib/broadcastStatus';
 import { isInWindow } from '../lib/replyWindow';
 
@@ -47,14 +48,6 @@ import {
 
 const PAGE_SIZE = 10;
 
-// What a button under an offer does when tapped. Mirrors posterButtonActions
-// in the bot's scheduler.go, which rejects anything not listed there.
-const BUTTON_ACTIONS = [
-  { value: 'view_offers', label: 'Show current offers' },
-  { value: 'view_menu', label: 'Show the menu' },
-  { value: 'visit', label: 'Show address & directions' },
-  { value: 'main_menu', label: 'Show the welcome message' },
-];
 const MAX_BUTTONS = 3; // WhatsApp's limit for reply buttons
 const BUTTON_TEXT_LIMIT = 20; // WhatsApp's limit, counted in characters
 const charCount = (text) => [...text].length; // an emoji is one character
@@ -155,6 +148,10 @@ const AUDIENCE_TABS = [
 
 /** A WhatsApp template's key in the picker: name and language together. */
 const waKey = (t) => `${t.name}|${t.language}`;
+
+/** A WhatsApp template's quick-reply buttons, in order. */
+const waButtons = (t) =>
+  ((t.components || []).find((c) => c.type === 'BUTTONS')?.buttons || []).filter((b) => b.type === 'QUICK_REPLY');
 
 /** The text of one part of a WhatsApp template, such as its BODY. */
 const waText = (t, type) => t?.components?.find((c) => c.type === type)?.text || '';
@@ -860,9 +857,16 @@ export default function Campaigns() {
                               {waText(waTemplate, 'BODY')}
                             </p>
                           )}
-                          {waTemplate && form.buttons.length > 0 && (
+                          {waTemplate && waButtons(waTemplate).length > 0 && (
                             <p className="text-[12px] leading-relaxed text-text-secondary">
-                              The template's quick-reply buttons take this offer's button actions in order.
+                              Template buttons:{' '}
+                              {waButtons(waTemplate)
+                                .map((b, i) => {
+                                  const action = waTemplate.actions?.[i] || form.buttons[i]?.id;
+                                  return `${b.text} → ${action ? actionLabel(action).toLowerCase() : 'nothing'}`;
+                                })
+                                .join(' · ')}
+                              . Change them on the Templates page.
                             </p>
                           )}
                         </>
