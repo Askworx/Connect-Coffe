@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { AlertCircle, CheckCircle2, FileCheck2, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Copy, FileCheck2, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 
 import { getWhatsAppTemplates, createWhatsAppTemplate, deleteWhatsAppTemplate, uploadImage } from '../api';
 
@@ -59,6 +59,13 @@ const REJECTION = {
 
 const component = (t, type) => (t.components || []).find((c) => c.type === type);
 
+const rejectionText = (t) =>
+  t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE'
+    ? REJECTION[t.rejected_reason] || t.rejected_reason
+    : '';
+
+const LANGUAGES = { en: 'English', en_US: 'English (US)', en_GB: 'English (UK)' };
+
 const emptyForm = () => ({
   title: '',
   body: '',
@@ -77,6 +84,7 @@ export default function Templates() {
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
+  const [viewing, setViewing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [modal, setModal] = useState({ open: false, title: '', message: '', type: 'info' });
 
@@ -113,8 +121,18 @@ export default function Templates() {
   const setButton = (i, value) =>
     setForm((f) => ({ ...f, buttons: f.buttons.map((b, j) => (j === i ? value : b)) }));
 
-  const openEditor = () => {
-    setForm(emptyForm());
+  // A sent template cannot be edited, so "edit" means starting a new one from
+  // its text; the photo has to be chosen again.
+  const openEditor = (from) => {
+    setForm(
+      from
+        ? {
+            ...emptyForm(),
+            body: component(from, 'BODY')?.text || '',
+            buttons: (component(from, 'BUTTONS')?.buttons || []).map((b) => b.text).slice(0, MAX_BUTTONS),
+          }
+        : emptyForm(),
+    );
     setErrors({});
     setLocalPreview('');
     setEditorOpen(true);
@@ -210,7 +228,7 @@ export default function Templates() {
               <RefreshCw className={loading ? 'animate-spin' : undefined} />
               Refresh
             </Button>
-            <Button onClick={openEditor}>
+            <Button onClick={() => openEditor(null)}>
               <Plus />
               New template
             </Button>
@@ -266,11 +284,22 @@ export default function Templates() {
             const status = templateStatus(t);
             const body = component(t, 'BODY')?.text || '';
             const buttons = (component(t, 'BUTTONS')?.buttons || []).map((b) => b.text);
-            const reason = t.status === 'REJECTED' && t.rejected_reason && t.rejected_reason !== 'NONE'
-              ? REJECTION[t.rejected_reason] || t.rejected_reason
-              : '';
+            const reason = rejectionText(t);
             return (
-              <Card key={t.id || t.name} className="flex flex-col gap-3 p-4">
+              <Card
+                key={t.id || t.name}
+                role="button"
+                tabIndex={0}
+                aria-label={`Open ${t.name}`}
+                onClick={() => setViewing(t)}
+                onKeyDown={(e) => {
+                  if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                    e.preventDefault();
+                    setViewing(t);
+                  }
+                }}
+                className="flex cursor-pointer flex-col gap-3 p-4 transition-shadow hover:shadow-lift focus-visible:outline-2 focus-visible:outline-primary"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <p className="break-all font-mono text-[13px] font-medium text-ink">{t.name}</p>
                   <Badge variant={status.variant}>{status.label}</Badge>
@@ -295,12 +324,16 @@ export default function Templates() {
                     ))}
                   </div>
                 )}
-                <div className="mt-auto flex items-center justify-end border-t border-border pt-3">
+                <div className="mt-auto flex items-center justify-between border-t border-border pt-3">
+                  <span className="text-[12px] font-medium text-primary">View</span>
                   <Button
                     variant="destructive-outline"
                     size="icon-xs"
                     aria-label={`Delete ${t.name}`}
-                    onClick={() => setConfirmDelete(t)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setConfirmDelete(t);
+                    }}
                   >
                     <Trash2 />
                   </Button>
@@ -310,6 +343,103 @@ export default function Templates() {
           })}
         </div>
       </Reveal>
+
+      {/* ── One template ────────────────────────────────────────────────── */}
+
+      <Dialog open={!!viewing} onClose={() => setViewing(null)} size="xl" labelledBy="template-view-title">
+        {viewing && (
+          <>
+            <DialogHeader
+              id="template-view-title"
+              eyebrow="Template"
+              title={viewing.name}
+              description="Meta does not allow changes to a sent template. To change the wording, start a new one from it."
+              onClose={() => setViewing(null)}
+            />
+            <DialogBody>
+              <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+                <div className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <Badge variant={templateStatus(viewing).variant}>{templateStatus(viewing).label}</Badge>
+                    {(viewing.status === 'PENDING' || viewing.status === 'IN_APPEAL') && (
+                      <p className="text-[12px] text-text-secondary">Meta usually answers within 24 hours.</p>
+                    )}
+                  </div>
+                  {rejectionText(viewing) && (
+                    <p className="rounded-lg bg-danger-light px-3 py-2 text-[13px] leading-relaxed text-danger">
+                      {rejectionText(viewing)} Change the wording and send a new template.
+                    </p>
+                  )}
+                  {viewing.problem && viewing.status === 'APPROVED' && (
+                    <p className="text-[13px] text-warning">Cannot be used for offers: {viewing.problem}.</p>
+                  )}
+                  {viewing.status === 'APPROVED' && !viewing.problem && (
+                    <p className="text-[13px] leading-relaxed text-text-secondary">
+                      Ready to use: in Broadcasts, choose <span className="font-medium text-ink">Who gets it → Everyone</span>{' '}
+                      and pick <code className="font-mono text-ink">{viewing.name}</code>. The offer’s own poster replaces
+                      the sample photo.
+                    </p>
+                  )}
+                  <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-[13px]">
+                    <dt className="text-text-secondary">Category</dt>
+                    <dd className="text-ink">{(viewing.category || '').toLowerCase()}</dd>
+                    <dt className="text-text-secondary">Language</dt>
+                    <dd className="text-ink">{LANGUAGES[viewing.language] || viewing.language}</dd>
+                    {viewing.id && (
+                      <>
+                        <dt className="text-text-secondary">Meta ID</dt>
+                        <dd className="font-mono text-ink">{viewing.id}</dd>
+                      </>
+                    )}
+                  </dl>
+                  <div className="space-y-2">
+                    <p className="eyebrow">Message</p>
+                    <p className="whitespace-pre-wrap rounded-lg border border-border bg-paper px-3 py-2.5 text-[13px] leading-relaxed text-body-text">
+                      {component(viewing, 'BODY')?.text}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <p className="eyebrow mb-3">Preview</p>
+                  <WhatsAppPreview
+                    message={component(viewing, 'BODY')?.text || ''}
+                    image={component(viewing, 'HEADER')?.example?.header_handle?.[0] || ''}
+                    buttons={(component(viewing, 'BUTTONS')?.buttons || []).map((b) => ({ title: b.text }))}
+                  />
+                </div>
+              </div>
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="destructive-outline"
+                onClick={() => {
+                  setConfirmDelete(viewing);
+                  setViewing(null);
+                }}
+              >
+                <Trash2 />
+                Delete
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const from = viewing;
+                  setViewing(null);
+                  openEditor(from);
+                }}
+              >
+                <Copy />
+                New template from this
+              </Button>
+              <Button type="button" onClick={() => setViewing(null)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </>
+        )}
+      </Dialog>
 
       {/* ── Editor ──────────────────────────────────────────────────────── */}
 
