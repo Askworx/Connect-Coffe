@@ -10,6 +10,7 @@ import {
   Radio,
   Settings2,
   Gift,
+  FileCheck2,
 } from 'lucide-react';
 
 import { cn } from '../lib/utils';
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
   { to: '/contacts', icon: Users, label: 'Contacts' },
   { to: '/offers', icon: Gift, label: 'Offers' },
   { to: '/campaigns', icon: Radio, label: 'Broadcasts' },
+  { to: '/templates', icon: FileCheck2, label: 'Templates' },
 
   // Table and workshop bookings made through the bot.
   { to: '/leads', icon: CalendarCheck, label: 'Bookings', divider: true },
