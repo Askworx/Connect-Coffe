@@ -435,6 +435,7 @@ return ( <div className="flex h-full overflow-hidden rounded-xl border border-bo
   <div
     className={`
       flex-1
+      min-w-0
       flex
       flex-col
       bg-background
@@ -628,7 +629,7 @@ return ( <div className="flex h-full overflow-hidden rounded-xl border border-bo
         {/* Messages */}
 
         <div
-          className="flex-1 overflow-y-auto p-6 lg:p-10 space-y-4"
+          className="flex-1 overflow-y-auto overflow-x-hidden p-6 lg:p-10 space-y-4"
           ref={scrollRef}
           onScroll={handleScroll}
         >
@@ -684,6 +685,8 @@ return ( <div className="flex h-full overflow-hidden rounded-xl border border-bo
                 <div
                   className={`
                     max-w-[70%]
+                    min-w-0
+                    [overflow-wrap:anywhere]
                     text-[13px]
                     font-medium
                     p-1

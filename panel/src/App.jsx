@@ -115,7 +115,7 @@ const AnimatedOutlet = ({ isMessages }) => {
     <AnimatePresence mode="wait" initial={false}>
       <PageTransition
         key={location.pathname}
-        className={isMessages ? 'flex h-full flex-col' : 'container-admin'}
+        className={isMessages ? 'flex h-full flex-col p-3 md:p-5' : 'container-admin'}
       >
         <Outlet />
       </PageTransition>
