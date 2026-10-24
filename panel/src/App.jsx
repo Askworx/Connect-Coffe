@@ -14,6 +14,7 @@ import Sidebar from './components/Sidebar';
 import WhatsAppMark from './components/WhatsAppMark';
 import { TOKEN_KEY } from './api';
 import { PageTransition } from './components/motion/PageTransition';
+import { cn } from './lib/utils';
 
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -40,6 +41,18 @@ const Layout = () => {
   const [collapsed, setCollapsed] = React.useState(
     () => typeof window !== 'undefined' && window.innerWidth < 1024,
   );
+
+  // Messages is a fixed-height chat console, not a document — it does its own
+  // scrolling (contact list, message log) and must land pixel-exact in the
+  // space below the header. It used to size itself with calc(100vh-9rem),
+  // guessing at the header height plus the container's padding; a 1px miss
+  // there (easy — border widths, sub-pixel layout) made `main` itself
+  // scrollable too, so a stray scrollbar showed up at the edge of the whole
+  // window even though there was nothing real to scroll. Letting main stretch
+  // Messages via flexbox instead removes the guesswork entirely. Every other
+  // route keeps the normal padded, page-scrolling container.
+  const location = useLocation();
+  const isMessages = location.pathname === '/messages';
 
   return (
     <div className="flex h-screen overflow-hidden bg-white text-body-text">
@@ -77,8 +90,13 @@ const Layout = () => {
 
         </header>
 
-        <main className="relative flex-1 overflow-y-auto bg-white">
-          <AnimatedOutlet />
+        <main
+          className={cn(
+            'relative flex-1 bg-white',
+            isMessages ? 'flex flex-col overflow-hidden' : 'overflow-y-auto',
+          )}
+        >
+          <AnimatedOutlet isMessages={isMessages} />
         </main>
       </div>
     </div>
@@ -90,12 +108,15 @@ const Layout = () => {
  * the route, otherwise React reuses the same element and the outgoing page
  * never gets a chance to leave.
  */
-const AnimatedOutlet = () => {
+const AnimatedOutlet = ({ isMessages }) => {
   const location = useLocation();
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      <PageTransition key={location.pathname} className="container-admin">
+      <PageTransition
+        key={location.pathname}
+        className={isMessages ? 'flex h-full flex-col' : 'container-admin'}
+      >
         <Outlet />
       </PageTransition>
     </AnimatePresence>

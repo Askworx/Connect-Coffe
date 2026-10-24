@@ -244,7 +244,7 @@ const filteredContacts = contacts.filter(c =>
 c.phone.includes(searchTerm)
 );
 
-return ( <div className="flex h-[calc(100vh-9rem)] overflow-hidden rounded-xl border border-border bg-white shadow-card">
+return ( <div className="flex h-full overflow-hidden rounded-xl border border-border bg-white shadow-card">
 <Modal
   isOpen={modal.open}
   onClose={() => setModal({ ...modal, open: false })}
