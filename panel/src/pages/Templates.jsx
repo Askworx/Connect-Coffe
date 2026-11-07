@@ -104,10 +104,10 @@ export default function Templates() {
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [modal, setModal] = useState({ open: false, title: '', message: '', type: 'info' });
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     setLoading(true);
     try {
-      const { data } = await getWhatsAppTemplates();
+      const { data } = await getWhatsAppTemplates(fresh);
       setTemplates(data?.data || []);
       setLoadError(data?.error || '');
     } catch (err) {
@@ -127,7 +127,7 @@ export default function Templates() {
   const anyInReview = templates.some((t) => t.status === 'PENDING' || t.status === 'IN_APPEAL');
   useEffect(() => {
     if (!anyInReview) return undefined;
-    const timer = setInterval(load, 3 * 60 * 1000);
+    const timer = setInterval(() => load(true), 3 * 60 * 1000);
     return () => clearInterval(timer);
   }, [anyInReview, load]);
 
@@ -275,7 +275,7 @@ export default function Templates() {
         intro="WhatsApp only lets you message people who wrote to you in the last 24 hours. To reach everyone else, Meta must first approve the message as a template. Write one here and it goes to Meta for review."
         action={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => load()} disabled={loading}>
+            <Button variant="outline" onClick={() => load(true)} disabled={loading}>
               <RefreshCw className={loading ? 'animate-spin' : undefined} />
               Refresh
             </Button>
@@ -305,7 +305,7 @@ export default function Templates() {
             <p className="text-[13px] font-medium text-danger">{loadError}</p>
             <button
               type="button"
-              onClick={() => load()}
+              onClick={() => load(true)}
               className="mt-1 text-[13px] font-medium text-danger underline underline-offset-2"
             >
               Try again

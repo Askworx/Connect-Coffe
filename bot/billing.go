@@ -128,56 +128,117 @@ var cafeZone = func() *time.Location {
 }()
 
 // billing gathers spend and balance, asking Meta at most every two minutes.
+var billingFetch sync.Mutex
+
+// billing returns the spend and balance. The last figures come back at once
+// and are refreshed in the background once two minutes old, so the panel
+// does not wait on Meta; fresh (after a send, or a new balance) waits for
+// Meta's latest instead.
 func billing(fresh bool) Billing {
 	billingCache.Lock()
-	defer billingCache.Unlock()
-	if !fresh && !billingCache.at.IsZero() && time.Since(billingCache.at) < 2*time.Minute {
+	b, at := billingCache.b, billingCache.at
+	billingCache.Unlock()
+	if !fresh && !at.IsZero() {
+		if time.Since(at) >= 2*time.Minute {
+			go refreshBilling(at)
+		}
+		return b
+	}
+	return refreshBilling(at)
+}
+
+// refreshBilling asks Meta again, unless another refresh finished since the
+// figures dated seen were read.
+func refreshBilling(seen time.Time) Billing {
+	billingFetch.Lock()
+	defer billingFetch.Unlock()
+	billingCache.Lock()
+	if billingCache.at.After(seen) {
+		defer billingCache.Unlock()
 		return billingCache.b
 	}
+	billingCache.Unlock()
 
+	b := computeBilling()
+	billingCache.Lock()
+	billingCache.b, billingCache.at = b, time.Now()
+	billingCache.Unlock()
+	return b
+}
+
+// computeBilling asks Meta for each period's spend. The questions are
+// independent, so they go out together: one after another they took about
+// three seconds.
+func computeBilling() Billing {
 	b := Billing{Currency: "INR", Rate: defaultMarketingRate}
 	now := time.Now().In(cafeZone)
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, cafeZone)
 	month := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, cafeZone)
 
-	if s, err := metaSpend(today, now); err == nil {
-		b.SpentToday, b.PaidToday = s.cost, s.marketingCount
-	} else {
-		b.Problem = "Could not read spending from WhatsApp: " + err.Error()
-	}
-	if s, err := metaSpendBy(now.AddDate(0, 0, -7), now, "DAILY"); err == nil {
-		b.Spent7d = s.cost
-	}
-	// The rate is whatever Meta charged per marketing message lately.
-	if s, err := metaSpendBy(now.AddDate(0, 0, -30), now, "DAILY"); err == nil && s.marketingCount > 0 {
-		b.Rate, b.RateFromMeta = s.marketingCost/float64(s.marketingCount), true
-	}
-	if s, err := metaSpendBy(month, now, "DAILY"); err == nil {
-		b.SpentMonth = s.cost
-	}
-
+	var balance *float64
+	balanceAt := ""
+	var balanceFrom time.Time
 	if raw := db.GetSetting(settingBalance); raw != "" {
 		if amount, err := strconv.ParseFloat(raw, 64); err == nil {
-			b.Balance = &amount
-			b.BalanceAt = db.GetSetting(settingBalanceAt)
-			left := amount
-			if at, err := time.Parse(time.RFC3339, b.BalanceAt); err == nil {
-				if s, err := metaSpend(at, now); err == nil {
-					b.SpentSince = s.cost
-					left -= s.cost
-				} else if b.Problem == "" {
-					b.Problem = "Could not read spending since the balance was entered: " + err.Error()
-				}
-			}
-			b.BalanceNow = &left
+			balance = &amount
+			balanceAt = db.GetSetting(settingBalanceAt)
+			balanceFrom, _ = time.Parse(time.RFC3339, balanceAt)
 		}
 	}
 
-	billingCache.b, billingCache.at = b, time.Now()
+	type answer struct {
+		s   spend
+		err error
+	}
+	var todayA, weekA, rateA, monthA, sinceA answer
+	var wg sync.WaitGroup
+	ask := func(out *answer, f func() (spend, error)) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			out.s, out.err = f()
+		}()
+	}
+	ask(&todayA, func() (spend, error) { return metaSpend(today, now) })
+	ask(&weekA, func() (spend, error) { return metaSpendBy(now.AddDate(0, 0, -7), now, "DAILY") })
+	ask(&rateA, func() (spend, error) { return metaSpendBy(now.AddDate(0, 0, -30), now, "DAILY") })
+	ask(&monthA, func() (spend, error) { return metaSpendBy(month, now, "DAILY") })
+	if balance != nil && !balanceFrom.IsZero() {
+		ask(&sinceA, func() (spend, error) { return metaSpend(balanceFrom, now) })
+	}
+	wg.Wait()
+
+	if todayA.err == nil {
+		b.SpentToday, b.PaidToday = todayA.s.cost, todayA.s.marketingCount
+	} else {
+		b.Problem = "Could not read spending from WhatsApp: " + todayA.err.Error()
+	}
+	if weekA.err == nil {
+		b.Spent7d = weekA.s.cost
+	}
+	if rateA.err == nil && rateA.s.marketingCount > 0 {
+		b.Rate, b.RateFromMeta = rateA.s.marketingCost/float64(rateA.s.marketingCount), true
+	}
+	if monthA.err == nil {
+		b.SpentMonth = monthA.s.cost
+	}
+
+	if balance != nil {
+		b.Balance, b.BalanceAt = balance, balanceAt
+		left := *balance
+		if !balanceFrom.IsZero() {
+			if sinceA.err == nil {
+				b.SpentSince = sinceA.s.cost
+				left -= sinceA.s.cost
+			} else if b.Problem == "" {
+				b.Problem = "Could not read spending since the balance was entered: " + sinceA.err.Error()
+			}
+		}
+		b.BalanceNow = &left
+	}
 	return b
 }
 
-// setBalance records the balance as read off WhatsApp Manager just now.
 func setBalance(amount float64) error {
 	if err := db.UpdateSetting(settingBalance, strconv.FormatFloat(amount, 'f', 2, 64)); err != nil {
 		return err

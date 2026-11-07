@@ -41,14 +41,34 @@ var limitCache struct {
 	at            time.Time
 }
 
-// metaTier asks Meta for the number's tier and quality rating, at most every
-// ten minutes.
+var tierFetch sync.Mutex
+
+// metaTier returns the number's tier and quality rating. Once known, the last
+// answer comes back at once and is refreshed in the background every ten
+// minutes, so the panel never waits on Meta for it.
 func metaTier() (tier, quality string, err error) {
 	limitCache.Lock()
-	defer limitCache.Unlock()
+	tier, quality, at := limitCache.tier, limitCache.quality, limitCache.at
+	limitCache.Unlock()
+	if tier != "" {
+		if time.Since(at) >= 10*time.Minute {
+			go fetchTier()
+		}
+		return tier, quality, nil
+	}
+	return fetchTier()
+}
+
+// fetchTier asks Meta for the tier and quality rating, one request at a time.
+func fetchTier() (tier, quality string, err error) {
+	tierFetch.Lock()
+	defer tierFetch.Unlock()
+	limitCache.Lock()
 	if limitCache.tier != "" && time.Since(limitCache.at) < 10*time.Minute {
+		defer limitCache.Unlock()
 		return limitCache.tier, limitCache.quality, nil
 	}
+	limitCache.Unlock()
 	token, phoneID := os.Getenv("ACCESS_TOKEN"), os.Getenv("PHONE_NUMBER_ID")
 	if token == "" || phoneID == "" {
 		return "", "", fmt.Errorf("WhatsApp is not connected")
@@ -75,7 +95,9 @@ func metaTier() (tier, quality string, err error) {
 		}
 		return "", "", fmt.Errorf("WhatsApp did not say (HTTP %d)", resp.StatusCode)
 	}
+	limitCache.Lock()
 	limitCache.tier, limitCache.quality, limitCache.at = body.Tier, body.Quality, time.Now()
+	limitCache.Unlock()
 	return body.Tier, body.Quality, nil
 }
 

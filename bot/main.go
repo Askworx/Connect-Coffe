@@ -144,6 +144,17 @@ func main() {
 		fmt.Fprintf(w, "<h1>%s bot is running</h1>", os.Getenv("COMPANY_NAME"))
 	})
 
+	// Ask Meta for the templates, limit and spend now, so the first person
+	// to open the panel after a deploy does not wait seconds for them.
+	if os.Getenv("ACCESS_TOKEN") != "" {
+		go func() {
+			fetchTemplates()
+			metaTier()
+			billing(false)
+			log.Printf("[Panel] WhatsApp templates, limit and spend loaded")
+		}()
+	}
+
 	r.HandleFunc("/webhook", WebhookHandler)
 	r.Post("/api/login", AuthHandler)
 	r.Mount("/api", AdminRoutes())

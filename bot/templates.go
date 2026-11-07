@@ -116,14 +116,30 @@ var templateCache struct {
 
 const templateCacheFor = 2 * time.Minute
 
-// fetchTemplates returns the business account's marketing templates. It
-// needs WABA_ID: templates belong to the WhatsApp Business Account, not to
-// the phone number.
-func fetchTemplates() ([]MetaTemplate, error) {
+// templateFetch lets one request to Meta run at a time; templateCache's own
+// lock is held only to read or swap the list, so a slow Meta never blocks a
+// reader of the cached one.
+var templateFetch sync.Mutex
+
+// cachedTemplateList returns the cached list and whether it is still fresh.
+func cachedTemplateList() ([]MetaTemplate, bool) {
 	templateCache.Lock()
 	defer templateCache.Unlock()
-	if templateCache.list != nil && time.Since(templateCache.fetched) < templateCacheFor {
-		return templateCache.list, nil
+	return templateCache.list, templateCache.list != nil && time.Since(templateCache.fetched) < templateCacheFor
+}
+
+// fetchTemplates returns the business account's marketing templates, asking
+// Meta when the cached list is missing or old. Sending uses this, so it never
+// works from a list more than a couple of minutes old. It needs WABA_ID:
+// templates belong to the WhatsApp Business Account, not to the phone number.
+func fetchTemplates() ([]MetaTemplate, error) {
+	if list, fresh := cachedTemplateList(); fresh {
+		return list, nil
+	}
+	templateFetch.Lock()
+	defer templateFetch.Unlock()
+	if list, fresh := cachedTemplateList(); fresh { // fetched while this one waited
+		return list, nil
 	}
 
 	waba := strings.TrimSpace(os.Getenv("WABA_ID"))
@@ -154,8 +170,24 @@ func fetchTemplates() ([]MetaTemplate, error) {
 	if err := json.Unmarshal(body, &page); err != nil {
 		return nil, fmt.Errorf("could not read Meta's template list: %w", err)
 	}
+	templateCache.Lock()
 	templateCache.list, templateCache.fetched = page.Data, time.Now()
+	templateCache.Unlock()
 	return page.Data, nil
+}
+
+// panelTemplates is fetchTemplates for showing the list: an old list comes
+// back at once and is refreshed in the background, so the page does not wait
+// on Meta. Only a missing list (first use, or just after a change) waits.
+func panelTemplates() ([]MetaTemplate, error) {
+	list, fresh := cachedTemplateList()
+	if list == nil {
+		return fetchTemplates()
+	}
+	if !fresh {
+		go fetchTemplates()
+	}
+	return list, nil
 }
 
 // findTemplate looks up one template by name and language.
@@ -299,7 +331,11 @@ func templatesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 
-	list, err := fetchTemplates()
+	// The Refresh button asks for Meta's latest, say to see an approval.
+	if r.URL.Query().Get("fresh") == "1" {
+		forgetTemplates()
+	}
+	list, err := panelTemplates()
 	if err != nil {
 		// 200 with the reason: the composer shows it instead of the picker.
 		json.NewEncoder(w).Encode(map[string]interface{}{"data": []item{}, "error": err.Error()})

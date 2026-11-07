@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"log"
+	"sync"
 	"time"
 )
 
@@ -106,8 +107,10 @@ func SyncNamesFromLeads() error {
 }
 
 func GetAllContacts() ([]Contact, error) {
-	// Sync names before fetching
-	SyncNamesFromLeads()
+	// Names given in a booking fill in contacts that have none. It is an
+	// UPDATE over every contact, so it runs at most once a minute rather than
+	// on every read of the list.
+	syncNamesSometimes()
 
 	query := `
 		SELECT c.id, c.phone, c.name, c.company, c.opt_out, c.joined_at, i.last_in
@@ -144,4 +147,19 @@ func GetAllContacts() ([]Contact, error) {
 		contacts = append(contacts, c)
 	}
 	return contacts, nil
+}
+
+var nameSync struct {
+	sync.Mutex
+	at time.Time
+}
+
+func syncNamesSometimes() {
+	nameSync.Lock()
+	defer nameSync.Unlock()
+	if time.Since(nameSync.at) < time.Minute {
+		return
+	}
+	nameSync.at = time.Now()
+	SyncNamesFromLeads()
 }

@@ -106,7 +106,9 @@ export const getBilling = (fresh = false) => api.get('/billing', { params: fresh
 export const setMetaBalance = (amount) => api.post('/billing/balance', { amount });
 // Approved marketing templates on the WhatsApp account, for reaching
 // contacts outside the free 24-hour window.
-export const getWhatsAppTemplates = () => api.get('/whatsapp-templates');
+// fresh asks Meta again instead of using the bot's recent copy.
+export const getWhatsAppTemplates = (fresh = false) =>
+  api.get('/whatsapp-templates', { params: fresh ? { fresh: 1 } : {} });
 // Sends a new marketing template to Meta for review.
 export const createWhatsAppTemplate = (data) => api.post('/whatsapp-templates', data);
 export const deleteWhatsAppTemplate = (name) => api.delete(`/whatsapp-templates/${encodeURIComponent(name)}`);

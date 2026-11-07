@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,26 +7,44 @@ import {
   Outlet,
   useLocation,
 } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { Menu, PanelLeftClose } from 'lucide-react';
 
 import Sidebar from './components/Sidebar';
 import WhatsAppMark from './components/WhatsAppMark';
 import { TOKEN_KEY } from './api';
-import { PageTransition } from './components/motion/PageTransition';
 import { cn } from './lib/utils';
 
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Leads from './pages/Leads';
-import Contacts from './pages/Contacts';
-import Messages from './pages/Messages';
-import Campaigns from './pages/Campaigns';
-import Offers from './pages/Offers';
-import Templates from './pages/Templates';
 
-// Internal Management Pages
-import BotConfig from './pages/BotConfig';
+// Each page is its own file, loaded the first time it is opened, so signing
+// in does not wait for the code of all eight. Once the panel is up, the rest
+// load in the background, so moving between pages never waits either.
+const PAGES = {
+  dashboard: () => import('./pages/Dashboard'),
+  messages: () => import('./pages/Messages'),
+  contacts: () => import('./pages/Contacts'),
+  offers: () => import('./pages/Offers'),
+  campaigns: () => import('./pages/Campaigns'),
+  templates: () => import('./pages/Templates'),
+  leads: () => import('./pages/Leads'),
+  config: () => import('./pages/BotConfig'),
+};
+const Dashboard = lazy(PAGES.dashboard);
+const Messages = lazy(PAGES.messages);
+const Contacts = lazy(PAGES.contacts);
+const Offers = lazy(PAGES.offers);
+const Campaigns = lazy(PAGES.campaigns);
+const Templates = lazy(PAGES.templates);
+const Leads = lazy(PAGES.leads);
+const BotConfig = lazy(PAGES.config);
+
+const preloadPages = () => Object.values(PAGES).forEach((load) => load().catch(() => {}));
+
+const PageLoading = () => (
+  <div className="flex justify-center py-24">
+    <span className="block size-6 animate-spin rounded-full border-2 border-line border-t-ink" />
+  </div>
+);
 
 /**
  * Every routed page renders inside this shell: ink rail on the left, a
@@ -104,22 +122,30 @@ const Layout = () => {
 };
 
 /**
- * Only the page body animates. AnimatePresence needs a key that changes with
- * the route, otherwise React reuses the same element and the outgoing page
- * never gets a chance to leave.
+ * The page body. It used to sit in framer-motion's AnimatePresence with
+ * mode="wait", which holds the new page back until the old one has faded
+ * out. Clicking to another page while that fade ran could leave it stuck
+ * half-way — opacity 0 — so the page came up blank until a reload. Now the
+ * new page mounts at once and only fades in, with a CSS animation that
+ * always ends visible.
  */
 const AnimatedOutlet = ({ isMessages }) => {
   const location = useLocation();
 
+  useEffect(() => {
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+    idle(preloadPages);
+  }, []);
+
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      <PageTransition
-        key={location.pathname}
-        className={isMessages ? 'flex h-full flex-col p-3 md:p-5' : 'container-admin'}
-      >
+    <div
+      key={location.pathname}
+      className={cn('page-enter', isMessages ? 'flex h-full flex-col p-3 md:p-5' : 'container-admin')}
+    >
+      <Suspense fallback={<PageLoading />}>
         <Outlet />
-      </PageTransition>
-    </AnimatePresence>
+      </Suspense>
+    </div>
   );
 };
 
