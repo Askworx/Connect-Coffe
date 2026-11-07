@@ -78,6 +78,7 @@ export function WhatsAppPreview({
   message,
   caption,
   image,
+  video = false,
   buttons = [],
   className,
   empty = 'Nothing to preview yet.',
@@ -100,7 +101,18 @@ export function WhatsAppPreview({
         {text || image ? (
           <div className="max-w-[420px]">
           <div className="overflow-hidden rounded-xl rounded-tl-sm border border-border bg-white shadow-card">
-            {image && (
+            {image && video && (
+              <video
+                key={image}
+                src={image}
+                controls
+                muted
+                playsInline
+                preload="metadata"
+                className="aspect-[4/3] w-full bg-ink object-contain"
+              />
+            )}
+            {image && !video && (
               <img
                 src={image}
                 alt=""

@@ -45,7 +45,7 @@ func AdminRoutes() chi.Router {
 		func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("X-Content-Type-Options", "nosniff")
-				w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'")
+				w.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self'; media-src 'self'")
 				next.ServeHTTP(w, r)
 			})
 		}(http.FileServer(http.Dir(uploadDir)))))
@@ -54,10 +54,11 @@ func AdminRoutes() chi.Router {
 		// Cap the whole request, not just what is buffered in memory.
 		// ParseMultipartForm alone spills the remainder to disk, so a large
 		// upload could fill the volume.
-		const maxUpload = 8 << 20 // 8 MiB
-		r.Body = http.MaxBytesReader(w, r.Body, maxUpload)
-		if err := r.ParseMultipartForm(maxUpload); err != nil {
-			http.Error(w, "That file is too large. The limit is 8 MB.", http.StatusRequestEntityTooLarge)
+		// Photos up to 8 MB; videos up to WhatsApp's own 16 MB limit.
+		const maxImage, maxVideo = 8 << 20, 16 << 20
+		r.Body = http.MaxBytesReader(w, r.Body, maxVideo+1<<20) // room for the form around the file
+		if err := r.ParseMultipartForm(maxImage); err != nil {
+			http.Error(w, "That file is too large. Photos can be up to 8 MB, videos up to 16 MB.", http.StatusRequestEntityTooLarge)
 			return
 		}
 
@@ -68,14 +69,23 @@ func AdminRoutes() chi.Router {
 		}
 		defer file.Close()
 
-		// Only images. These files are served back from this origin, so
-		// accepting arbitrary types would let an uploaded .html or .svg run
-		// script against the API's own origin.
+		// Only images and MP4 videos. These files are served back from this
+		// origin, so accepting arbitrary types would let an uploaded .html or
+		// .svg run script against the API's own origin.
 		head := make([]byte, 512)
 		n, _ := file.Read(head)
 		contentType := http.DetectContentType(head[:n])
-		if !strings.HasPrefix(contentType, "image/") {
-			http.Error(w, "Only image files can be uploaded.", http.StatusUnsupportedMediaType)
+		isVideo := contentType == "video/mp4"
+		if !strings.HasPrefix(contentType, "image/") && !isVideo {
+			http.Error(w, "Only photos and MP4 videos can be uploaded.", http.StatusUnsupportedMediaType)
+			return
+		}
+		if !isVideo && handler.Size > maxImage {
+			http.Error(w, "That photo is too large. The limit is 8 MB.", http.StatusRequestEntityTooLarge)
+			return
+		}
+		if isVideo && handler.Size > maxVideo {
+			http.Error(w, "That video is too large. WhatsApp's limit is 16 MB.", http.StatusRequestEntityTooLarge)
 			return
 		}
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
@@ -84,6 +94,12 @@ func AdminRoutes() chi.Router {
 		}
 
 		filename := fmt.Sprintf("%d_%s", time.Now().UnixNano(), safeUploadName(handler.Filename))
+		// The address is how the bot tells a video from a photo when it sends.
+		if isVideo && !strings.HasSuffix(strings.ToLower(filename), ".mp4") {
+			filename += ".mp4"
+		} else if !isVideo && isVideoURL(filename) {
+			filename += ".jpg"
+		}
 		dst, err := os.Create(filepath.Join(uploadDir, filename))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -452,6 +468,10 @@ func AdminRoutes() chi.Router {
 				return
 			}
 			if problem := templateProblem(t); problem != "" {
+				http.Error(w, fmt.Sprintf("template %q cannot be used: %s", t.Name, problem), http.StatusBadRequest)
+				return
+			}
+			if problem := templateMediaProblem(t, c.ImageURL); problem != "" {
 				http.Error(w, fmt.Sprintf("template %q cannot be used: %s", t.Name, problem), http.StatusBadRequest)
 				return
 			}

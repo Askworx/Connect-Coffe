@@ -98,6 +98,29 @@ func sendImageWithButtonsResult(to, imageURL, bodyText string, buttons []Button)
 	return sendButtonsWithHeader(to, header, bodyText, buttons, "[Image: "+imageURL+"] "+bodyText)
 }
 
+// sendMediaWithButtonsResult puts an offer's photo or video on top of its
+// button message. WhatsApp plays a video header inline, like a photo.
+func sendMediaWithButtonsResult(to, mediaURL, bodyText string, buttons []Button) metaResult {
+	if !isVideoURL(mediaURL) {
+		return sendImageWithButtonsResult(to, mediaURL, bodyText, buttons)
+	}
+	header := map[string]interface{}{
+		"type":  "video",
+		"video": map[string]string{"link": mediaURL},
+	}
+	return sendButtonsWithHeader(to, header, bodyText, buttons, "[Video: "+mediaURL+"] "+bodyText)
+}
+
+// isVideoURL reports whether an offer's media is a video. WhatsApp takes MP4
+// (and 3GP) videos; the upload saves them under .mp4, so the address says it.
+func isVideoURL(raw string) bool {
+	u := strings.ToLower(strings.TrimSpace(raw))
+	if i := strings.IndexAny(u, "?#"); i >= 0 {
+		u = u[:i]
+	}
+	return strings.HasSuffix(u, ".mp4") || strings.HasSuffix(u, ".3gp")
+}
+
 // sendDocumentWithButtons puts a file, such as the menu PDF, on top of a
 // button message. One message keeps the file ahead of the text; sent
 // separately, the text often arrives first because Meta fetches the file.

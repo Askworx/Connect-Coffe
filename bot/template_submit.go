@@ -20,7 +20,7 @@ import (
 
 // The panel's Templates page writes a marketing template and sends it to Meta
 // for review, so the café never has to open WhatsApp Manager. Only the shape
-// the broadcaster can send is offered: an image header, fixed body text and
+// the broadcaster can send is offered: an image or video header, fixed body text and
 // up to three quick-reply buttons. templateProblem refuses anything else when
 // an offer is saved, so a template made here is always usable once approved.
 
@@ -29,7 +29,8 @@ import (
 const (
 	templateBodyLimit   = 1024
 	templateButtonLimit = 25
-	templateImageLimit  = 5 << 20 // Meta refuses header images over 5 MB
+	templateImageLimit  = 5 << 20  // Meta refuses header images over 5 MB
+	templateVideoLimit  = 16 << 20 // and header videos over 16 MB
 )
 
 var templateNamePattern = regexp.MustCompile(`^[a-z0-9_]{1,512}$`)
@@ -59,7 +60,7 @@ func (d *templateDraft) check() string {
 		return "the message cannot contain {{ }}; the bot has nothing to fill them with"
 	}
 	if strings.TrimSpace(d.ImageURL) == "" {
-		return "choose a photo; the offer's own poster replaces it when it is sent"
+		return "choose a photo or video; the offer's own replaces it when it is sent"
 	}
 	if len(d.Buttons) > 3 {
 		return "a template can have at most 3 buttons"
@@ -154,8 +155,8 @@ func metaAppID() (string, error) {
 	return app.ID, nil
 }
 
-// uploadSampleImage gives Meta the template's example header image and
-// returns the handle a template submission refers to it by.
+// uploadSampleImage gives Meta the template's example header photo or video
+// and returns the handle a template submission refers to it by.
 func uploadSampleImage(imageURL string) (string, error) {
 	i := strings.Index(imageURL, "/uploads/")
 	if i < 0 {
@@ -169,12 +170,18 @@ func uploadSampleImage(imageURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("that photo is no longer on the server; upload it again")
 	}
-	if len(data) > templateImageLimit {
-		return "", fmt.Errorf("the photo is larger than 5 MB; use a smaller one")
-	}
 	kind := http.DetectContentType(data)
-	if kind != "image/jpeg" && kind != "image/png" {
-		return "", fmt.Errorf("WhatsApp takes JPG or PNG photos for templates")
+	switch kind {
+	case "image/jpeg", "image/png":
+		if len(data) > templateImageLimit {
+			return "", fmt.Errorf("the photo is larger than 5 MB; use a smaller one")
+		}
+	case "video/mp4":
+		if len(data) > templateVideoLimit {
+			return "", fmt.Errorf("the video is larger than 16 MB; use a smaller one")
+		}
+	default:
+		return "", fmt.Errorf("WhatsApp takes JPG or PNG photos, or MP4 videos, for templates")
 	}
 
 	app, err := metaAppID()
@@ -234,9 +241,13 @@ func createTemplateHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSONError(w, http.StatusBadGateway, "Not sent: "+err.Error())
 		return
 	}
+	headerFormat := "IMAGE"
+	if isVideoURL(d.ImageURL) {
+		headerFormat = "VIDEO"
+	}
 
 	components := []map[string]interface{}{
-		{"type": "HEADER", "format": "IMAGE", "example": map[string][]string{"header_handle": {handle}}},
+		{"type": "HEADER", "format": headerFormat, "example": map[string][]string{"header_handle": {handle}}},
 		{"type": "BODY", "text": d.Body},
 	}
 	if len(d.Buttons) > 0 {

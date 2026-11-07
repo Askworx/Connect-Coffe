@@ -65,8 +65,8 @@ func templateProblem(t MetaTemplate) string {
 	for _, c := range t.Components {
 		switch c.Type {
 		case "HEADER":
-			if c.Format != "IMAGE" && c.Format != "TEXT" {
-				return "its header must be an image or plain text"
+			if c.Format != "IMAGE" && c.Format != "VIDEO" && c.Format != "TEXT" {
+				return "its header must be an image, a video or plain text"
 			}
 		case "BUTTONS":
 			for _, b := range c.Buttons {
@@ -78,6 +78,22 @@ func templateProblem(t MetaTemplate) string {
 		if strings.Contains(c.Text, "{{") {
 			return "its text has {{ }} values to fill in; use one without them"
 		}
+	}
+	return ""
+}
+
+// templateMediaProblem returns why t cannot carry an offer's media, or "":
+// an image header needs a photo and a video header needs a video.
+func templateMediaProblem(t MetaTemplate, mediaURL string) string {
+	h, ok := t.component("HEADER")
+	if !ok {
+		return ""
+	}
+	switch {
+	case h.Format == "IMAGE" && isVideoURL(mediaURL):
+		return "it has a photo header, but this offer has a video; choose a video template"
+	case h.Format == "VIDEO" && !isVideoURL(mediaURL):
+		return "it has a video header, but this offer has a photo; choose a photo template"
 	}
 	return ""
 }
@@ -212,7 +228,7 @@ func checkTemplateActions(actions []string, quick int) string {
 }
 
 // sendTemplate sends t to one contact and reports whether Meta accepted it.
-// An image header carries the offer's photo. Quick-reply buttons carry the
+// An image or video header carries the offer's photo or video. Quick-reply buttons carry the
 // given actions in order as their payloads, so a tap does what that action
 // does anywhere else in the bot.
 func sendTemplate(to string, t MetaTemplate, imageURL string, actions []string) metaResult {
@@ -234,11 +250,12 @@ func sendTemplate(to string, t MetaTemplate, imageURL string, actions []string) 
 // language, and the values its image header and quick-reply buttons take.
 func templateMessage(t MetaTemplate, imageURL string, actions []string) map[string]interface{} {
 	var components []map[string]interface{}
-	if h, ok := t.component("HEADER"); ok && h.Format == "IMAGE" {
+	if h, ok := t.component("HEADER"); ok && (h.Format == "IMAGE" || h.Format == "VIDEO") {
+		kind := strings.ToLower(h.Format)
 		components = append(components, map[string]interface{}{
 			"type": "header",
 			"parameters": []map[string]interface{}{
-				{"type": "image", "image": map[string]string{"link": imageURL}},
+				{"type": kind, kind: map[string]string{"link": imageURL}},
 			},
 		})
 	}

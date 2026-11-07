@@ -291,7 +291,7 @@ func broadcastPoster(camp db.Campaign, phones []string) int {
 
 	sent := 0
 	for _, phone := range phones {
-		if recordSend(camp.ID, phone, "free", sendImageWithButtonsResult(phone, image, caption, buttons)) {
+		if recordSend(camp.ID, phone, "free", sendMediaWithButtonsResult(phone, image, caption, buttons)) {
 			sent++
 		}
 	}
@@ -368,6 +368,13 @@ func broadcastTemplate(camp db.Campaign, phones []string) int {
 	}
 
 	image := publicImageURL(camp.ImageURL)
+	if problem := templateMediaProblem(t, image); problem != "" {
+		log.Printf("❌ [Scheduler] Campaign #%d: no template messages sent: %s", camp.ID, problem)
+		for _, phone := range phones {
+			recordSend(camp.ID, phone, "template", metaResult{Error: "template " + t.Name + " cannot be sent: " + problem})
+		}
+		return 0
+	}
 	sent := 0
 	for _, phone := range phones {
 		if recordSend(camp.ID, phone, "template", sendTemplate(phone, t, image, actions)) {

@@ -8,6 +8,7 @@ import {
   Plus,
   Send,
   FileBarChart,
+  Film,
   Trash2,
   X,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ import {
 import { BUTTON_ACTIONS, actionLabel, guessAction } from '../lib/buttonActions';
 import { getBroadcastStatus } from '../lib/broadcastStatus';
 import { isInWindow } from '../lib/replyWindow';
+import { isVideoUrl, isVideoFile, mediaFileProblem } from '../lib/media';
 
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
@@ -152,6 +154,9 @@ const AUDIENCE_TABS = [
   { value: 'free', label: 'Last 24 hours' },
   { value: 'everyone', label: 'Everyone' },
 ];
+
+/** A WhatsApp template's header kind: IMAGE, VIDEO, TEXT or ''. */
+const waHeader = (t) => t?.components?.find((c) => c.type === 'HEADER')?.format || '';
 
 /** A WhatsApp template's key in the picker: name and language together. */
 const waKey = (t) => `${t.name}|${t.language}`;
@@ -438,13 +443,21 @@ export default function Campaigns() {
 
   const validate = () => {
     const next = {};
-    if (uploadSource === 'url' && !form.image_url.trim()) next.image = 'Add a photo — paste its link or upload one.';
-    if (uploadSource === 'local' && !form.localFile) next.image = 'Choose a photo to upload.';
+    if (uploadSource === 'url' && !form.image_url.trim()) next.image = 'Add a photo or video — paste its link or upload one.';
+    if (uploadSource === 'local') {
+      const problem = mediaFileProblem(form.localFile);
+      if (problem) next.image = problem;
+    }
     if (!form.caption.trim()) next.caption = 'Write the offer people will read.';
     if (when === 'later' && !form.scheduled_at) next.scheduled_at = 'Choose when it should go out.';
     const problem = buttonProblem(form.buttons);
     if (problem) next.buttons = problem;
     if (reach === 'everyone' && !waTemplate) next.waTemplate = 'Choose the approved template to send to everyone else.';
+    else if (reach === 'everyone' && previewIsVideo && waHeader(waTemplate) === 'IMAGE') {
+      next.waTemplate = 'This template has a photo header, but the offer is a video. Choose a video template.';
+    } else if (reach === 'everyone' && !previewIsVideo && waHeader(waTemplate) === 'VIDEO') {
+      next.waTemplate = 'This template has a video header, but the offer is a photo. Choose a photo template.';
+    }
     if (reach === 'everyone' && maxPaid !== '') {
       const n = Number(maxPaid);
       if (!Number.isInteger(n) || n < 1) next.maxPaid = 'Enter a whole number, 1 or more.';
@@ -562,13 +575,14 @@ export default function Campaigns() {
 
   const previewCaption = form.caption.trim();
   const previewImage = uploadSource === 'local' ? localPreview : form.image_url.trim();
+  const previewIsVideo = uploadSource === 'local' ? isVideoFile(form.localFile) : isVideoUrl(form.image_url);
 
   return (
     <>
       <PageHeader
         eyebrow="Marketing"
         title="Broadcasts"
-        intro="Send an offer — a photo, a few lines and buttons to tap. People who messaged Connect in the last 24 hours get it free; everyone else needs a paid template, within WhatsApp's daily limit."
+        intro="Send an offer — a photo or video, a few lines and buttons to tap. People who messaged Connect in the last 24 hours get it free; everyone else needs a paid template, within WhatsApp's daily limit."
         action={
           <Button onClick={() => openComposer()}>
             <Plus />
@@ -724,7 +738,18 @@ export default function Campaigns() {
                         aria-label={`Open “${headline(campaign)}” to send again`}
                         className="group flex w-full items-start gap-3 text-left"
                       >
-                        {campaign.image_url ? (
+                        {campaign.image_url && isVideoUrl(campaign.image_url) ? (
+                          <span className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-ink">
+                            <video
+                              src={`${campaign.image_url}#t=0.5`}
+                              muted
+                              playsInline
+                              preload="metadata"
+                              className="size-full object-cover"
+                            />
+                            <Film aria-hidden="true" className="absolute bottom-1 right-1 size-3.5 text-white drop-shadow" />
+                          </span>
+                        ) : campaign.image_url ? (
                           <img
                             src={campaign.image_url}
                             alt=""
@@ -919,22 +944,22 @@ export default function Campaigns() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Photo</Label>
+                  <Label>Photo or video</Label>
                   <Tabs value={uploadSource} onValueChange={setUploadSource} items={SOURCE_TABS} layoutId="offer-source" />
                   {uploadSource === 'url' ? (
                     <Input
-                      aria-label="Photo link"
+                      aria-label="Photo or video link"
                       value={form.image_url}
                       onChange={(e) => setField('image_url', e.target.value)}
-                      placeholder="https://…/photo.jpg"
+                      placeholder="https://…/photo.jpg or https://…/video.mp4"
                       aria-invalid={!!errors.image}
                     />
                   ) : (
                     <>
                       <input
                         type="file"
-                        accept="image/*"
-                        aria-label="Photo file"
+                        accept="image/*,video/mp4"
+                        aria-label="Photo or video file"
                         onChange={(e) => chooseFile(e.target.files[0])}
                         className="w-full rounded-lg border border-dashed border-line-strong bg-paper p-4 text-[13px] text-text-secondary file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-[12px] file:font-medium file:text-white"
                       />
@@ -946,6 +971,9 @@ export default function Campaigns() {
                       )}
                     </>
                   )}
+                  <p className="text-[12px] leading-relaxed text-text-secondary">
+                    A JPG/PNG photo, or an MP4 video up to 16 MB. A video plays in the chat above the message.
+                  </p>
                   {errors.image && (
                     <p role="alert" className="text-[12px] text-danger">{errors.image}</p>
                   )}
@@ -1037,8 +1065,11 @@ export default function Campaigns() {
                     <div className="space-y-2">
                       <p className="text-[12px] leading-relaxed text-text-secondary">
                         People in the last 24 hours get this offer free. Every other subscribed contact gets an
-                        approved WhatsApp marketing template with this photo, and Meta charges for each one
-                        delivered.
+                        approved WhatsApp marketing template with this {previewIsVideo ? 'video' : 'photo'}, and
+                        Meta charges for each one delivered.{' '}
+                        {previewIsVideo
+                          ? 'A video offer needs a template made with a video header.'
+                          : 'A photo offer needs a template made with a photo header.'}
                       </p>
                       {audience && limit && (
                         <div className="space-y-2 rounded-lg border border-border bg-paper px-3 py-3 text-[12px] leading-relaxed">
@@ -1128,7 +1159,9 @@ export default function Campaigns() {
                             </option>
                             {waTemplates.list.map((t) => (
                               <option key={waKey(t)} value={waKey(t)} disabled={!!t.problem}>
-                                {t.name} ({t.language}){t.problem ? ` — ${t.problem}` : ''}
+                                {t.name} ({t.language})
+                                {waHeader(t) === 'VIDEO' ? ' · video' : waHeader(t) === 'IMAGE' ? ' · photo' : ''}
+                                {t.problem ? ` — ${t.problem}` : ''}
                               </option>
                             ))}
                           </Select>
@@ -1188,6 +1221,7 @@ export default function Campaigns() {
                 <WhatsAppPreview
                   message={previewCaption}
                   image={previewImage}
+                  video={previewIsVideo}
                   buttons={form.buttons}
                   empty="Pick a template or write a message to see it here."
                 />

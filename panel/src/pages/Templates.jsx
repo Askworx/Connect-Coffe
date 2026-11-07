@@ -9,6 +9,7 @@ import {
   uploadImage,
 } from '../api';
 import { BUTTON_ACTIONS, actionLabel, guessAction } from '../lib/buttonActions';
+import { isVideoFile } from '../lib/media';
 
 import PageHeader from '../components/PageHeader';
 import Modal from '../components/Modal';
@@ -200,8 +201,11 @@ export default function Templates() {
     if (!form.body.trim()) next.body = 'Write the message.';
     else if (charCount(form.body.trim()) > BODY_LIMIT) next.body = `Keep it to ${BODY_LIMIT} characters.`;
     else if (form.body.includes('{{')) next.body = 'Remove the {{ }}; the bot cannot fill them in.';
-    if (!form.localFile) next.image = 'Choose a photo.';
-    else if (!/^image\/(jpeg|png)$/.test(form.localFile.type)) next.image = 'Use a JPG or PNG photo.';
+    if (!form.localFile) next.image = 'Choose a photo or video.';
+    else if (isVideoFile(form.localFile)) {
+      if (form.localFile.type !== 'video/mp4') next.image = 'Use an MP4 video.';
+      else if (form.localFile.size > 16 * 1024 * 1024) next.image = 'Use a video under 16 MB.';
+    } else if (!/^image\/(jpeg|png)$/.test(form.localFile.type)) next.image = 'Use a JPG or PNG photo, or an MP4 video.';
     else if (form.localFile.size > 5 * 1024 * 1024) next.image = 'Use a photo under 5 MB.';
     const buttons = form.buttons.map((b) => b.title.trim());
     if (buttons.some((b) => !b)) next.buttons = 'Fill in every button, or remove the empty one.';
@@ -493,6 +497,7 @@ export default function Templates() {
                   <WhatsAppPreview
                     message={component(viewing, 'BODY')?.text || ''}
                     image={component(viewing, 'HEADER')?.example?.header_handle?.[0] || ''}
+                    video={component(viewing, 'HEADER')?.format === 'VIDEO'}
                     buttons={quickReplies(viewing).map((b) => ({ title: b.text }))}
                   />
                 </div>
@@ -561,11 +566,11 @@ export default function Templates() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Photo</Label>
+                  <Label>Photo or video</Label>
                   <input
                     type="file"
-                    accept="image/jpeg,image/png"
-                    aria-label="Photo file"
+                    accept="image/jpeg,image/png,video/mp4"
+                    aria-label="Photo or video file"
                     onChange={(e) => chooseFile(e.target.files[0])}
                     className="w-full rounded-lg border border-dashed border-line-strong bg-paper p-4 text-[13px] text-text-secondary file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-[12px] file:font-medium file:text-white"
                   />
@@ -576,7 +581,9 @@ export default function Templates() {
                     </p>
                   )}
                   <p className="text-[12px] text-text-secondary">
-                    A sample for Meta’s reviewers, JPG or PNG. Each offer sends its own poster in its place.
+                    A sample for Meta’s reviewers: a JPG/PNG photo (up to 5 MB) or an MP4 video (up to 16 MB).
+                    Each offer sends its own in its place — a video template works only with video offers, a
+                    photo template only with photo offers.
                   </p>
                   {errors.image && <p role="alert" className="text-[12px] text-danger">{errors.image}</p>}
                 </div>
@@ -674,6 +681,7 @@ export default function Templates() {
                 <WhatsAppPreview
                   message={form.body}
                   image={localPreview}
+                  video={isVideoFile(form.localFile)}
                   buttons={form.buttons.map((b) => ({ title: b.title }))}
                   empty="Write the message to see it here."
                 />
